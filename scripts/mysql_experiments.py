@@ -5,8 +5,8 @@ Created on 20 Jun 2017
 '''
 import MySQLdb as mdb
 
-HOST = '127.0.0.1'
-USER = 'root'
+HOST = 'localhost'
+USER = 'wayne'
 PASSWORD = ''
 
 
@@ -41,8 +41,19 @@ def test_creating_table():
         cur.execute("INSERT INTO Writers(Name) VALUES('Lion Feuchtwanger')")
         cur.execute("INSERT INTO Writers(Name) VALUES('Emile Zola')")
         cur.execute("INSERT INTO Writers(Name) VALUES('Truman Capote')")
-    
-        cur.execute("SELECT * FROM testdb.Writers")
-        for row in cur.fetchall():
-            print(row)
 
+
+def test_reading_dictionary_cursor():
+    con = mdb.connect(HOST, USER, PASSWORD, 'testdb')
+    
+    with con:
+    
+        cur = con.cursor(mdb.cursors.DictCursor)
+        cur.execute("SELECT * FROM Writers")
+    
+        rows = cur.fetchall()
+        
+        print(rows)
+    
+        for row in rows:
+            print row["Id"], row["Name"]
