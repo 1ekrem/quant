@@ -6,8 +6,8 @@ Created on 21 Jun 2017
 import os
 import numpy as np
 import pandas as pd
-import logging
 from datetime import datetime as dt
+from quant.lib.main_utils import logger
 from quant.lib import data_utils as du, timeseries_utils as tu
 
 
@@ -33,10 +33,10 @@ def insert_test_data():
     delete_script = du.get_pandas_bulk_delete_script(data, 'Singers', 'name', 'time_index')
     e = du.execute_sql_input_script('testdb', delete_script)
     if e is not None:
-        logging.warning('Failed to clear test data: ' + str(e))
+        logger.warning('Failed to clear test data: ' + str(e))
     e = du.execute_sql_input_script('testdb', insert_script)
     if e is not None:
-        logging.warning('Failed to insert test data: ' + str(e))
+        logger.warning('Failed to insert test data: ' + str(e))
 
 
 def new_insert_test_data():

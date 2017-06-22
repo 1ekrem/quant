@@ -6,7 +6,7 @@ Created on Jun 1, 2017
 import numpy as np
 import pandas as pd
 import MySQLdb as mdb
-import logging
+from quant.lib.main_utils import logger
 from datetime import datetime as dt
 
 # Database info
@@ -109,7 +109,7 @@ def get_database_connection(database_name='mysql'):
     try:
         return mdb.connect(host=HOST, user=USER, passwd=PASSWORD, db=database_name)
     except Exception as e:
-        logging.warning('Failed to establish databse connection: ' + str(e))
+        logger.warning('Failed to establish databse connection: ' + str(e))
         return None
 
 
@@ -143,19 +143,19 @@ def create_timeseries_table(database_name, table_name):
     script = CREATE_TABLE_IF_NOT_EXISTS % (table_name, TIMESERIES_TABLE_FORMAT)
     e = execute_sql_input_script(database_name, script)
     if e is not None:
-        logging.warning('Failed to create table: ' + str(e))
+        logger.warning('Failed to create table: ' + str(e))
 
 
 def pandas_bulk_insert(data, database_name, table_name, column_name, index_name, value_name):
     delete_script = get_pandas_bulk_delete_script(data, table_name, column_name, index_name)
     e = execute_sql_input_script(database_name, delete_script)
     if e is not None:
-        logging.warning('Failed to clear data from table: ' + str(e))
+        logger.warning('Failed to clear data from table: ' + str(e))
     else:
         insert_script = get_pandas_bulk_insert_script(data, table_name, column_name, index_name, value_name)
         e = execute_sql_input_script(database_name, insert_script)
         if e is not None:
-            logging.warning('Failed to insert data: ' + str(e))
+            logger.warning('Failed to insert data: ' + str(e))
 
 
 def get_pandas_output(data, column_name, index_name, value_name):
@@ -169,4 +169,4 @@ def pandas_read(database_name, table_name, column_name, index_name, value_name, 
     if success:
         return get_pandas_output(data, column_name, index_name, value_name) if len(data)>0 else None
     else:
-        logging.warning('Failed to read data: ' + str(data))
+        logger.warning('Failed to read data: ' + str(data))

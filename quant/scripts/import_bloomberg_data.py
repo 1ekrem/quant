@@ -4,8 +4,8 @@ Created on 22 Jun 2017
 @author: wayne
 '''
 import os
-import logging
 import pandas as pd
+from quant.lib.main_utils import logger
 from quant.lib import timeseries_utils as tu, data_utils as du
 
 DATABASE_NAME = 'quant'
@@ -48,21 +48,21 @@ def create_tables():
 
 
 def load_bloomberg_data():
-    logging.info('Reading data file')
+    logger.info('Reading data file')
     data = read_data()
-    logging.info('Loading fx rates')
+    logger.info('Loading fx rates')
     ts = format_price_data(data['FX'])
     tu.store_timeseries(ts, DATABASE_NAME, 'bloomberg_fx_rates')
-    logging.info('Loading index prices')
+    logger.info('Loading index prices')
     ts = format_price_data(data['EQ'])
     tu.store_timeseries(ts, DATABASE_NAME, 'bloomberg_index_prices')
-    logging.info('Loading fund prices')
+    logger.info('Loading fund prices')
     ts = format_price_data(data['Blackrock'])
     tu.store_timeseries(ts, DATABASE_NAME, 'bloomberg_fund_prices')
-    logging.info('Loading economic data')
+    logger.info('Loading economic data')
     ts = format_econ_data(data['US'])
     for k, v in ts.iteritems():
-        logging.info('Loading %s' % k)
+        logger.info('Loading %s' % k)
         for kk, vv in v.iteritems():
             vv.name = k + '|' + kk
             tu.store_timeseries(vv, DATABASE_NAME, 'bloomberg_us_econ')
