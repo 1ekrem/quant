@@ -5,6 +5,8 @@ Created on Jun 1, 2017
 '''
 import pandas as pd
 import numpy as np
+from quant.lib import data_utils as du
+
 
 
 def resample(ts, timeline, carry_forward=True):
@@ -23,3 +25,11 @@ def resample(ts, timeline, carry_forward=True):
                 if ts.index[t+1] in idx:
                     ts.iloc[t+1] = ts.iloc[t]
     return ts.loc[timeline.index]
+
+
+def store_timeseries(ts, database_name, table_name):
+    du.pandas_bulk_insert(ts, database_name, table_name, du.TIMESERIES_COLUMN_NAME, du.TIMESERIES_INDEX_NAME, du.TIMESERIES_VALUE_NAME)
+
+
+def get_timeseries(database_name, table_name, index_range=None, column_list=None):
+    return du.pandas_read(database_name, table_name, du.TIMESERIES_COLUMN_NAME, du.TIMESERIES_INDEX_NAME, du.TIMESERIES_VALUE_NAME, index_range, column_list)
