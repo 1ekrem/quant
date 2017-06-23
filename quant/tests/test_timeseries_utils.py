@@ -7,7 +7,7 @@ import unittest
 import pandas as pd
 import numpy as np
 from datetime import datetime as dt
-from lib import timeseries_utils as tu
+from quant.lib import timeseries_utils as tu
 
 a = pd.Series([1., 2.], index=[dt(2010,1,1), dt(2010,2,1)])
 b = pd.DataFrame([[0., 1.], [2., 3.]], index=[dt(2010,1,1), dt(2010,1,15)], columns=['C1', 'C2'])
@@ -18,10 +18,10 @@ x = np.arange(3)
 
 class TestResample(unittest.TestCase):
 
-    def testRaiseTypeError1(self):
+    def testRaiseAssertError1(self):
         self.assertRaises(AssertionError, tu.resample, x, a)
 
-    def testRaiseTypeError2(self):
+    def testRaiseAssertError2(self):
         self.assertRaises(AssertionError, tu.resample, a, x)
     
     def testResampleWithForefilling(self):
