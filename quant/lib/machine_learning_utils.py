@@ -142,3 +142,21 @@ def BoostingStump(x, y):
             logger.warning('Boosting stump failed at variable %s: %s' % (str(myy.columns[i]), str(e)))
     return pd.concat(ans, axis=0)
 
+
+# Prediction
+def StumpPrediction(x, c):
+    '''
+    Prediction with a single stump
+
+    Input
+    --------
+    x    Input variable
+    c    Cut-off point
+
+    Notes
+    --------
+    Predict 1 if x >=c else -1
+
+    '''
+    return 2. * (x >= c) - 1.
+

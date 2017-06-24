@@ -97,5 +97,11 @@ class TestDummyStump(unittest.TestCase):
         self.assertEqual(2.5, mu.DummyStump(d, pd.Series(b)))
 
 
+class TestStumpPrediction(unittest.TestCase):
+    
+    def testCalculation(self):
+        self.assertTrue(e.equals(mu.StumpPrediction(d.to_frame(), 3.)))
+
+
 if __name__ == "__main__":
     unittest.main()
