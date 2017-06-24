@@ -24,6 +24,7 @@ TIMESERIES_TABLE_FORMAT = "time_index DATETIME, column_name VARCHAR(50), value F
 BULK_TABLE_INSERT = "INSERT INTO %s %s VALUES %s;"
 BULK_TABLE_DELETE = "DELETE FROM %s WHERE %s in (%s);"
 READ_TABLE = "SELECT %s FROM %s %s;"
+READ_COLUMN_VALUES = "SELECT DISTINCT(%s) FROM %s;"
 
 
 def _series_to_insert_sql(s):
@@ -104,6 +105,10 @@ def get_pandas_read_script(table_name, column_name, index_name, value_name, inde
     return READ_TABLE % (read_format_script, table_name, condition_script)
 
 
+def get_table_column_value_scripts(table_name, column_name=TIMESERIES_COLUMN_NAME):
+    return READ_COLUMN_VALUES % (column_name, table_name)
+
+
 # Database i/o
 def get_database_connection(database_name='mysql'):
     try:
@@ -170,3 +175,14 @@ def pandas_read(database_name, table_name, column_name, index_name, value_name, 
         return get_pandas_output(data, column_name, index_name, value_name) if len(data)>0 else None
     else:
         logger.warning('Failed to read data: ' + str(data))
+
+
+def get_table_column_values(database_name, table_name, column_name=TIMESERIES_COLUMN_NAME):
+    read_script = get_table_column_value_scripts(table_name, column_name)
+    success, data = execute_sql_output_script(database_name, read_script)
+    if success:
+        return [x[0] for x in data] if len(data)>0 else None
+    else:
+        logger.warning('Failed to read column names: ' + str(data))
+
+    

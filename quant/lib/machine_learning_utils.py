@@ -85,6 +85,9 @@ def get_weight_from_error(e):
 
     
 def estimate_boosting_stump(x, y):
+    '''
+    Estimating boosting stump for one target variable
+    '''
     ans = []
     alpha = np.repeat(1. / len(y), len(y))
     pred = x.iloc[:, 0]

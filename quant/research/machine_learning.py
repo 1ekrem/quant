@@ -4,7 +4,7 @@ Created on 22 Jun 2017
 @author: wayne
 '''
 
-from quant.lib import timeseries_utils as tu
+from quant.lib import timeseries_utils as tu, data_utils as du
 
 DATABASE_NAME = 'quant'
 INDEX_TABLE_NAME = 'bloomberg_index_prices'
@@ -49,3 +49,8 @@ def load_bloomberg_econ_revision(ticker, table_name=US_ECON_TABLE_NAME):
         return (last - release).shift()
     else:
         return None
+
+
+def get_bloomberg_econ_list(table_name=US_ECON_TABLE_NAME):
+    vals = du.get_table_column_values(DATABASE_NAME, table_name)
+    return vals if vals is None else list(set([x.split('|')[0] for x in vals]))
