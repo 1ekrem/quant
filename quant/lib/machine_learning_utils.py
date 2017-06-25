@@ -8,6 +8,7 @@ import pandas as pd
 from quant.lib.main_utils import logger
 
 MINIMUM_ERROR = 1e-4
+BOOSTING_INTERCEPT = 'Intercept'
 
 
 # utility functions
@@ -96,7 +97,7 @@ def estimate_boosting_stump(x, y):
     alpha[y < 0] *= np.exp(w)
     alpha[y > 0] *= np.exp(-w)
     alpha /= np.sum(alpha)
-    ans.append(['Intercept', y.name, np.nan, w])
+    ans.append([BOOSTING_INTERCEPT, y.name, np.nan, w])
     for i in np.arange(np.size(x, 1)):
         pred = x.iloc[:, i]
         u = DummyStump(pred, y * alpha)
@@ -159,4 +160,43 @@ def StumpPrediction(x, c):
 
     '''
     return 2. * (x >= c) - 1.
+
+
+def BoostingPrediction(x, ans):
+    '''
+    Boosting prediction
+    
+    Input
+    --------
+    x        Input variable
+    ans      Boosting estimation results
+
+    Output
+    --------
+    DataFrame of predictions for the target variables
+
+    '''
+    if ans is None:
+        return None
+    else:
+        targets = list(set(ans['target'].values))
+        predictions = dict(zip(targets, [[]] * len(targets)))
+        for config in ans.T.to_dict().values():
+            target = config['target']
+            predicative = config['predicative']
+            weight = config['weight']
+            estimation = config['estimation']
+            if predicative == BOOSTING_INTERCEPT:
+                tmp = x.iloc[:, 0].copy() * np.nan
+                tmp = tmp.fillna(1.)
+                
+            else:
+                tmp = StumpPrediction(x[predicative], estimation)
+            predictions[target].append(tmp * weight)
+        results = []
+        for k, v in predictions.iteritems():
+            tmp = pd.concat(v, axis=1).sum(axis=1)
+            tmp.name = k
+            results.append(tmp)
+        return pd.concat(results, axis=1) 
 
