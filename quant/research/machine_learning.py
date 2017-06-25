@@ -3,8 +3,10 @@ Created on 22 Jun 2017
 
 @author: wayne
 '''
+import pandas as pd
 from datetime import datetime as dt
-from quant.lib import timeseries_utils as tu, data_utils as du
+from quant.lib import timeseries_utils as tu, data_utils as du, portfolio_utils as pu
+from quant.lib.main_utils import logger
 
 DATABASE_NAME = 'quant'
 INDEX_TABLE_NAME = 'bloomberg_index_prices'
@@ -63,13 +65,56 @@ class USEconBoosting(object):
         -    Original data vs. Score
         -    Raw, change, revision
     '''
-    def __init__(self, assets, start_date, end_date, frequency, sample_window, *args, **kwargs):
+    def __init__(self, assets, start_date, end_date, frequency, sample_window, table_name=INDEX_TABLE_NAME, *args, **kwargs):
         self.assets = assets
         self.start_date = start_date
         self.end_date = end_date
         self.frequency = frequency
         self.sample_window = sample_window
+        self.table_name = table_name
+        self.run_simulation()
 
+    def run_simulation(self):
+        self.get_timeline()
+        self.load_asset_prices()
+        self.load_economic_datasets()
+
+    def get_timeline(self):
+        logger.info('Creating time line')
+        self.timeline = pu.get_timeline(self.start_date, self.end_date, self.frequency, self.sample_window)
+        self._load_start = self.timeline.index[0]
+        self._load_end = self.timeline.index[-1]
+
+    def load_asset_prices(self):
+        logger.info('Loading asset prices')
+        self.asset_prices = tu.get_timeseries(DATABASE_NAME, self.table_name, (self._load_start, self._load_end), self.assets)
+
+    def load_economic_datasets(self):
+        logger.info('Loading economic variables')
+        self.economic_variables = get_bloomberg_econ_list(US_ECON_TABLE_NAME)
+        self.economic_dataset = {}
+        logger.info('Loading economic release')
+        release = []
+        for ticker in self.economic_variables:
+            data = load_bloomberg_econ_release(ticker)
+            if data is not None:
+                release.append(tu.resample(data, self.timeline))
+        self.economic_dataset['Release'] = pd.concat(release, axis=1)
+        logger.info('Loading economic change')
+        change = []
+        for ticker in self.economic_variables:
+            data = load_bloomberg_econ_change(ticker)
+            if data is not None:
+                change.append(tu.resample(data, self.timeline))
+        self.economic_dataset['Change'] = pd.concat(change, axis=1)
+        logger.info('Loading economic revision')
+        revision = []
+        for ticker in self.economic_variables:
+            data = load_bloomberg_econ_revision(ticker)
+            if data is not None:
+                revision.append(tu.resample(data, self.timeline))
+        self.economic_dataset['Revision'] = pd.concat(revision, axis=1)
+        
 
 def run_us_econ_boosting():
     sim = USEconBoosting(['SPX Index'], dt(2000, 1, 1), dt(2017, 6, 1), 'M', 24)
