@@ -3,7 +3,7 @@ Created on 22 Jun 2017
 
 @author: wayne
 '''
-
+from datetime import datetime as dt
 from quant.lib import timeseries_utils as tu, data_utils as du
 
 DATABASE_NAME = 'quant'
@@ -54,3 +54,24 @@ def load_bloomberg_econ_revision(ticker, table_name=US_ECON_TABLE_NAME):
 def get_bloomberg_econ_list(table_name=US_ECON_TABLE_NAME):
     vals = du.get_table_column_values(DATABASE_NAME, table_name)
     return vals if vals is None else list(set([x.split('|')[0] for x in vals]))
+
+
+# Simulations
+class USEconBoosting(object):
+    '''
+    Univariate forecasting
+        -    Original data vs. Score
+        -    Raw, change, revision
+    '''
+    def __init__(self, assets, start_date, end_date, frequency, sample_window, *args, **kwargs):
+        self.assets = assets
+        self.start_date = start_date
+        self.end_date = end_date
+        self.frequency = frequency
+        self.sample_window = sample_window
+
+
+def run_us_econ_boosting():
+    sim = USEconBoosting(['SPX Index'], dt(2000, 1, 1), dt(2017, 6, 1), 'M', 24)
+    return sim
+    
