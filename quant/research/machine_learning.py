@@ -13,6 +13,7 @@ INDEX_TABLE_NAME = 'bloomberg_index_prices'
 US_ECON_TABLE_NAME = 'bloomberg_us_econ'
 ACTUAL_RELEASE = 'ACTUAL_RELEASE'
 PX_LAST = 'PX_LAST'
+DATA_MISSING_FAIL = 0.7
 
 
 def load_bloomberg_index_prices(ticker='SPX Index'):
@@ -65,23 +66,29 @@ class USEconBoosting(object):
         -    Original data vs. Score
         -    Raw, change, revision
     '''
-    def __init__(self, assets, start_date, end_date, frequency, sample_window, table_name=INDEX_TABLE_NAME, *args, **kwargs):
+    def __init__(self, assets, start_date, end_date, frequency, sample_window,
+                 model_frequency, table_name=INDEX_TABLE_NAME, data_missing_fail=DATA_MISSING_FAIL,
+                 *args, **kwargs):
         self.assets = assets
         self.start_date = start_date
         self.end_date = end_date
         self.frequency = frequency
         self.sample_window = sample_window
+        self.model_frequency = model_frequency
         self.table_name = table_name
+        self.data_missing_fail = data_missing_fail
         self.run_simulation()
 
     def run_simulation(self):
         self.get_timeline()
         self.load_asset_prices()
         self.load_economic_datasets()
+        self.run_univariate_experiments()
 
     def get_timeline(self):
         logger.info('Creating time line')
         self.timeline = pu.get_timeline(self.start_date, self.end_date, self.frequency, self.sample_window)
+        self.model_timeline = self.timeline.resample(self.model_frequency).last()
         self._load_start = self.timeline.index[0]
         self._load_end = self.timeline.index[-1]
 
@@ -114,9 +121,36 @@ class USEconBoosting(object):
             if data is not None:
                 revision.append(tu.resample(data, self.timeline))
         self.economic_dataset['Revision'] = pd.concat(revision, axis=1)
-        
+    
+    def run_univariate_experiments(self):
+        for data_type in ['Release', 'Change', 'Revision']:
+            dataset = self.economic_dataset[data_type]
+            for ticker in self.economic_variables:
+                data = tu.resample(dataset[ticker], self.timeline).to_frame()
+                for input_type in ['Original', 'Score']:
+                    models = []
+                    for idx, model_time in enumerate(self.model_timeline.index):
+                        logger.info('Running %s %s %s at %s' % (ticker, data_type, input_type, model_time.strftime('%Y-%m-%d')))
+                        in_sample = self.timeline.copy()
+                        in_sample = in_sample.loc[in_sample.index <= model_time]
+                        in_sample = in_sample.iloc[-self.sample_window:]
+                        in_sample_data = pu.ignore_insufficient_series(data.loc[in_sample.index],
+                                                                       self.sample_window * self.data_missing_fail)
+                        if in_sample_data is None:
+                            logger.info('Insufficient Data - ignored')
+                        else:
+                            out_of_sample = self.timeline.copy()
+                            out_of_sample = out_of_sample.loc[out_of_sample.index > model_time]
+                            if idx < len(self.model_timeline) - 1:
+                                next_date = self.model_timeline.index[idx + 1]
+                                out_of_sample = out_of_sample.loc[out_of_sample.index <= next_date]
+                            out_of_sample_data = data.loc[out_of_sample.index]
+                            
+                            
+                        
+                
 
 def run_us_econ_boosting():
-    sim = USEconBoosting(['SPX Index'], dt(2000, 1, 1), dt(2017, 6, 1), 'M', 24)
+    sim = USEconBoosting(['SPX Index'], dt(2002, 1, 1), dt(2017, 6, 1), 'M', 24, 'Q')
     return sim
     

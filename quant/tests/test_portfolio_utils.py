@@ -4,6 +4,7 @@ Created on 25 Jun 2017
 @author: wayne
 '''
 import unittest
+import numpy as np
 import pandas as pd
 from datetime import datetime as dt
 from quant.lib import portfolio_utils as pu
@@ -15,6 +16,8 @@ TB = pd.Series([0.] * 5, name='timeline', index=[dt(2016,12,30), dt(2017,1,2), d
 T1 = pd.Series([0.] * 2, name='timeline', index=[dt(2016,12,26), dt(2017,1,2)])
 TM = pd.Series([0.] * 2, name='timeline', index=[dt(2016,12,31), dt(2017,1,31)])
 TMS = pd.Series([0.] * 3, name='timeline', index=[dt(2016,12,1), dt(2017,1,1), dt(2017, 2, 1)])
+TDF = pd.DataFrame(np.tril(np.ones((5, 5))))
+TDF[TDF <= 0] = np.nan
 
 
 class TestGetTimeline(unittest.TestCase):
@@ -39,6 +42,18 @@ class TestGetTimeline(unittest.TestCase):
 
     def testMSFrequency(self):
         self.assertTrue(TMS.equals(pu.get_timeline(d1, d3, 'MS', 1)))
+
+
+class TestIgnoreInsufficientSeries(unittest.TestCase):
+
+    def testRaiseWrongInput(self):
+        self.assertRaises(AssertionError, pu.ignore_insufficient_series, TB, 5)
+
+    def testCalculation(self):
+        self.assertTrue(TDF.iloc[:, :3].equals(pu.ignore_insufficient_series(TDF, 3)))
+        
+    def testReturnsNone(self):
+        self.assertIsNone(pu.ignore_insufficient_series(TDF, 6))
 
 
 if __name__ == "__main__":
