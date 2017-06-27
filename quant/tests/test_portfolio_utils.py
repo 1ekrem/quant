@@ -18,6 +18,12 @@ TM = pd.Series([0.] * 2, name='timeline', index=[dt(2016,12,31), dt(2017,1,31)])
 TMS = pd.Series([0.] * 3, name='timeline', index=[dt(2016,12,1), dt(2017,1,1), dt(2017, 2, 1)])
 TDF = pd.DataFrame(np.tril(np.ones((5, 5))))
 TDF[TDF <= 0] = np.nan
+TONE = pd.DataFrame(np.ones((5, 2)))
+TPARAMS = pd.DataFrame([[1., 3., 2.]] * 2, columns=['mean', 'median', 'std'])
+TTWO = TONE.copy()
+TTWO.iloc[:, 1] = np.nan
+TSIG = pd.Series(np.arange(5) - 2.).to_frame()
+TPRT = pd.Series([0., 0., 0., 1., 1.]).to_frame()
 
 
 class TestGetTimeline(unittest.TestCase):
@@ -56,5 +62,20 @@ class TestIgnoreInsufficientSeries(unittest.TestCase):
         self.assertIsNone(pu.ignore_insufficient_series(TDF, 6))
 
 
+class TestGetDistributionScores(unittest.TestCase):
+    
+    def testCalculation(self):
+        self.assertTrue((.5 * TONE).equals(pu.get_distribution_scores(TONE, TPARAMS)))
+
+    def testDealWithNans(self):
+        self.assertTrue((.5 * TTWO).equals(pu.get_distribution_scores(TTWO, TPARAMS)))
+
+
+class TestSimpleLongOnly(unittest.TestCase):
+    
+    def testCalculation(self):
+        self.assertTrue(TPRT.equals(pu.SimipleLongOnly(TSIG)))
+
+    
 if __name__ == "__main__":
     unittest.main()

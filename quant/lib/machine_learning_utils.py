@@ -5,6 +5,7 @@ Created on 23 Jun 2017
 '''
 import numpy as np
 import pandas as pd
+from quant.lib import portfolio_utils as pu
 from quant.lib.main_utils import logger
 
 MINIMUM_ERROR = 1e-4
@@ -199,5 +200,49 @@ def BoostingPrediction(x, ans):
             tmp.name = k
             results.append(tmp)
         return pd.concat(results, axis=1) 
+
+
+# Strategy Components
+class BoostingStumpComponent(object):
+    '''
+    Strategy component using boosting stump
     
+    Input
+    --------
+    in_sample_data
+    out_of_sample_data
+    use_score
+
+    '''    
+    def __init__(self, asset_returns, in_sample_data, out_of_sample_data, use_scores=False, *args, **kwargs):
+        self.asset_returns = asset_returns
+        self.in_sample_data = in_sample_data
+        self.out_of_sample_data = out_of_sample_data
+        self.use_scores = use_scores
+        self.run_model()
+
+    def run_model(self):
+        self.prepare_data()
+        self.estimate_model()
+        self.calculate_signals()
     
+    def prepare_data(self):
+        self.distribution_params = pu.get_distribution_parameters(self.in_sample_data)
+        if self.use_scores:
+            in_sample_data = self.in_sample_data
+            out_of_sample_data = self.out_of_sample_data
+        else:
+            in_sample_data = pu.get_distribution_scores(self.in_sample_data, self.distribution_params)
+            out_of_sample_data = pu.get_distribution_scores(self.out_of_sample_data, self.distribution_params)
+        self._x = in_sample_data.fillna(in_sample_data.median(axis=0))
+        self._y = self.asset_returns.fillna(0.)
+        self._z = out_of_sample_data.fillna(out_of_sample_data.median(axis=0))
+
+    def estimate_model(self):
+        self.model = BoostingStump(self._x, self._y)
+    
+    def calculate_signals(self):
+        in_sample_signal = BoostingPrediction(self._x, self.model)
+        signal_distribution = pu.get_distribution_parameters(in_sample_signal)
+        self.signal = BoostingPrediction(self._z, self.model)
+        self.normalized_signal = pu.get_distribution_scores(self.signal, signal_distribution)
