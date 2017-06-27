@@ -86,6 +86,13 @@ def SimipleLongOnly(signal, *args, **kwargs):
     return 1. * (signal > 0)
 
 
+def NormalizedSimpleLongOnly(normalized_signal, *args, **kwargs):
+    '''
+    Simple long-only positions using normalized signal
+    '''
+    return 1. * (normalized_signal > 0.5)
+
+
 # performance analytics
 def calc_mean(returns):
     return 52. * returns.resample('W').sum().mean(axis=0)
@@ -203,11 +210,15 @@ class Sim(object):
         self.normalized_signal = pd.concat(self.normalized_signal, axis=0)
 
     def calculate_returns(self):
-        self.asset_returns = self.asset_prices[self.start_date:self.end_date].resample('B').last().ffill().diff()
+        logger.info('Simulating strategy returns')
+        self.asset_returns = self.asset_prices.resample('B').last().ffill().diff()
         self.positions = self.position_component(**{'signal': self.signal, 'normalized_signal': self.normalized_signal})
         self.strategy_returns = tu.resample(self.positions, self.asset_returns).shift() * self.asset_returns
+        self.strategy_returns = self.strategy_returns[self.positions.first_valid_index():]
+        self.asset_returns = self.asset_returns[self.positions.first_valid_index():]
 
     def get_analytics(self):
+        logger.info('Calculating analytics')
         self.analytics = {}
         for asset in self.assets:
             rtn = pd.concat([self.asset_returns[asset], self.strategy_returns[asset]], axis=1)

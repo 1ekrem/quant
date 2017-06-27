@@ -3,6 +3,8 @@ Created on 22 Jun 2017
 
 @author: wayne
 '''
+import os
+import pandas as pd
 from datetime import datetime as dt
 from quant.lib import timeseries_utils as tu, data_utils as du, portfolio_utils as pu, machine_learning_utils as mu
 
@@ -73,13 +75,41 @@ def bloomberg_revision_loader(tickers, start_date=None, end_date=None):
 
 
 # Simulations
-def run_us_econ_boosting():
-    econ = get_bloomberg_econ_list()
+def univariate_run_one(input, input_type='release', use_scores=False):
+    if input_type == 'release':
+        input_data_loader = bloomberg_release_loader
+    elif input_type == 'change':
+        input_data_loader = bloomberg_change_loader
+    elif input_type == 'revision':
+        input_data_loader = bloomberg_revision_loader
+    simulation_name = '%s %s %s' % (input, input_type, 'scores' if use_scores else 'original')
     sim = pu.Sim(assets=['SPX Index'], asset_data_loader=load_bloomberg_index_prices,
                  start_date=dt(2002, 1, 1), end_date=dt(2017, 6, 1), data_frequency='M',
-                 sample_window=24, model_frequency='Q', inputs = [econ[0]],
-                 input_data_loader=bloomberg_release_loader, strategy_component=mu.BoostingStumpComponent,
-                 use_scores = False, position_component=pu.SimipleLongOnly,
-                 simulation_name='%s Release Original' % econ[0])
-    return sim
+                 sample_window=24, model_frequency='Q', inputs = [input],
+                 input_data_loader=input_data_loader, strategy_component=mu.BoostingStumpComponent,
+                 use_scores = use_scores, position_component=pu.NormalizedSimpleLongOnly,
+                 simulation_name=simulation_name)
+    a = sim.analytics['SPX Index'].iloc[1, :]
+    sharpes = sim.analytics['SPX Index']['sharpe']
+    a.loc['sharpe improvement'] = sharpes.values[1] - sharpes.values[0]
+    a.loc['input type'] = input_type
+    a.loc['input'] = input
+    a.loc['scores'] = use_scores
+    return a
+
+
+def run_univariate_econ_boosting():
+    analytics = []
+    econ = get_bloomberg_econ_list()
+    for input_type in ['release', 'change', 'revision']:
+        for use_scores in [False, True]:
+            for input in econ:
+                analytics.append(univariate_run_one(input, input_type, use_scores))
+    analytics = pd.concat(analytics, axis=1).T
+    analytics.to_csv(os.path.expanduser('~/TempWork/quant/univariate_boosting.csv'))
+    return analytics
+
+
+if __name__ == '__main__':
+    _ = run_univariate_econ_boosting()
 
