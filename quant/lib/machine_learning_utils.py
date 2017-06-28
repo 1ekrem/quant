@@ -165,7 +165,7 @@ def RandomBoosting(x, y, forest_size=100):
     '''
     myx, _ = give_me_pandas_variables(x, y)
     sequence = get_random_sequence(np.size(myx, 1), forest_size)
-    return [(seq, BoostingStump(x, y)) for seq in sequence]
+    return [(seq, BoostingStump(x.iloc[:, seq], y)) for seq in sequence]
     
     
 # Prediction
@@ -249,13 +249,12 @@ class Component(object):
 
     '''    
     def __init__(self, asset_returns, in_sample_data, out_of_sample_data, model_function, 
-                 prediction_function, use_scores=False, *args, **kwargs):
+                 prediction_function, *args, **kwargs):
         self.asset_returns = asset_returns
         self.in_sample_data = in_sample_data
         self.out_of_sample_data = out_of_sample_data
         self.model_function = model_function
         self.prediction_function = prediction_function
-        self.use_scores = use_scores
         self.run_model()
 
     def run_model(self):
@@ -265,12 +264,8 @@ class Component(object):
     
     def prepare_data(self):
         self.distribution_params = pu.get_distribution_parameters(self.in_sample_data)
-        if self.use_scores:
-            in_sample_data = self.in_sample_data
-            out_of_sample_data = self.out_of_sample_data
-        else:
-            in_sample_data = pu.get_distribution_scores(self.in_sample_data, self.distribution_params)
-            out_of_sample_data = pu.get_distribution_scores(self.out_of_sample_data, self.distribution_params)
+        in_sample_data = self.in_sample_data
+        out_of_sample_data = self.out_of_sample_data
         self._x = in_sample_data.fillna(in_sample_data.median(axis=0))
         self._y = self.asset_returns.fillna(0.)
         self._z = out_of_sample_data.fillna(out_of_sample_data.median(axis=0))
@@ -286,20 +281,18 @@ class Component(object):
 
 
 class BoostingStumpComponent(object):
-    def __init__(self, asset_returns, in_sample_data, out_of_sample_data, use_scores=False):
+    def __init__(self, asset_returns, in_sample_data, out_of_sample_data):
         self.core = Component(asset_returns, in_sample_data, out_of_sample_data,
-                              model_function=BoostingStump, prediction_function=BoostingPrediction,
-                              use_scores=use_scores)
+                              model_function=BoostingStump, prediction_function=BoostingPrediction)
         self.model = self.core.model
         self.signal = self.core.signal
         self.normalized_signal = self.core.normalized_signal
 
 
 class RandomBoostingComponent(object):
-    def __init__(self, asset_returns, in_sample_data, out_of_sample_data, use_scores=False):
+    def __init__(self, asset_returns, in_sample_data, out_of_sample_data):
         self.core = Component(asset_returns, in_sample_data, out_of_sample_data,
-                              model_function=RandomBoosting, prediction_function=RandomBoostingPrediction,
-                              use_scores=use_scores)
+                              model_function=RandomBoosting, prediction_function=RandomBoostingPrediction)
         self.model = self.core.model
         self.signal = self.core.signal
         self.normalized_signal = self.core.normalized_signal

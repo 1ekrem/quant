@@ -5,6 +5,6 @@ Created on 22 Jun 2017
 '''
 import logging
 
-logging.basicConfig()
+logging.basicConfig(format='%(asctime)s %(message)s')
 logger = logging.getLogger('quant')
 logger.setLevel(20)

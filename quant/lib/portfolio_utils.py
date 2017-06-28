@@ -135,7 +135,7 @@ class Sim(object):
     '''
     def __init__(self, start_date, end_date, data_frequency, model_frequency, sample_window,
                  assets, asset_data_loader, inputs, input_data_loader, strategy_component,
-                 use_scores, position_component, simulation_name, data_missing_pass=0.7):
+                 position_component, simulation_name, data_missing_pass=0.7):
         self.simulation_name = simulation_name
         self.assets = assets
         self.asset_data_loader = asset_data_loader
@@ -147,7 +147,6 @@ class Sim(object):
         self.sample_window = sample_window
         self.model_frequency = model_frequency
         self.strategy_component = strategy_component
-        self.use_scores = use_scores
         self.position_component = position_component
         self.data_missing_pass = data_missing_pass
         self.run_sim()
@@ -201,8 +200,7 @@ class Sim(object):
                 out_of_sample_data = self._data.loc[out_of_sample.index, in_sample_data.columns]
                 comp = self.strategy_component(asset_returns=asset_returns,
                                                in_sample_data=in_sample_data,
-                                               out_of_sample_data=out_of_sample_data,
-                                               use_scores=self.use_scores)
+                                               out_of_sample_data=out_of_sample_data)
                 self.models.append((model_time, comp.model))
                 self.signal.append(comp.signal)
                 self.normalized_signal.append(comp.normalized_signal)
