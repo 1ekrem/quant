@@ -87,7 +87,7 @@ def univariate_run_one(input, input_type='release', use_scores=False):
                  start_date=dt(2002, 1, 1), end_date=dt(2017, 6, 1), data_frequency='M',
                  sample_window=24, model_frequency='Q', inputs = [input],
                  input_data_loader=input_data_loader, strategy_component=mu.BoostingStumpComponent,
-                 use_scores = use_scores, position_component=pu.NormalizedSimpleLongOnly,
+                 use_scores = use_scores, position_component=pu.SimpleLongOnly,
                  simulation_name=simulation_name)
     a = sim.analytics['SPX Index'].iloc[1, :]
     sharpes = sim.analytics['SPX Index']['sharpe']
@@ -108,6 +108,45 @@ def run_univariate_econ_boosting():
     analytics = pd.concat(analytics, axis=1).T
     analytics.to_csv(os.path.expanduser('~/TempWork/quant/univariate_boosting.csv'))
     return analytics
+
+
+def multivariate_run_one(model, input_type='release'):
+    econ = get_bloomberg_econ_list()
+    if input_type == 'release':
+        input_data_loader = bloomberg_release_loader
+    elif input_type == 'change':
+        input_data_loader = bloomberg_change_loader
+    elif input_type == 'revision':
+        input_data_loader = bloomberg_revision_loader
+    if model == 'Boosting':
+        strategy_component = mu.BoostingStumpComponent
+    elif model == 'RandomBoosting':
+        strategy_component = mu.RandomBoostingComponent
+    simulation_name = '%s %s' % (model, input_type)
+    sim = pu.Sim(assets=['SPX Index'], asset_data_loader=load_bloomberg_index_prices,
+                 start_date=dt(2003, 1, 1), end_date=dt(2017, 6, 1), data_frequency='M',
+                 sample_window=36, model_frequency='Q', inputs=econ,
+                 input_data_loader=input_data_loader, strategy_component=strategy_component,
+                 use_scores=False, position_component=pu.NormalizedSimpleLongOnly,
+                 simulation_name=simulation_name)
+    a = sim.analytics['SPX Index'].iloc[1, :]
+    acc = sim.strategy_returns.iloc[:, 0].cumsum()
+    acc.name = '%s (mean: %.2f, std: %.2f, sharpe: %.2f)' % (simulation_name, a.loc['mean'], a.loc['std'], a.loc['sharpe'])
+    a0 = sim.analytics['SPX Index'].iloc[0, :]
+    acc0 = sim.asset_returns.iloc[:, 0].cumsum()
+    acc0.name = 'SPX Index (mean: %.2f, std: %.2f, sharpe: %.2f)' % (a0.loc['mean'], a0.loc['std'], a0.loc['sharpe'])
+    return acc, acc0
+
+
+def run_multivariate_econ_boosting():
+    accs = []
+    for model in ['RandomBoosting', 'Boosting']:
+        for input_type in ['release', 'change', 'revision']:
+            acc, acc0 = multivariate_run_one(model, input_type)
+            if len(accs) == 0:
+                accs.append(acc0)
+            accs.append(acc)
+    return pd.concat(accs, axis=1)
 
 
 if __name__ == '__main__':

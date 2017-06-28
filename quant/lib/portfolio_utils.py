@@ -79,7 +79,7 @@ def get_distribution_scores(data, params):
 
 
 # portfolio components
-def SimipleLongOnly(signal, *args, **kwargs):
+def SimpleLongOnly(signal, *args, **kwargs):
     '''
     Simple long-only positions
     '''
@@ -198,7 +198,7 @@ class Sim(object):
                 if idx < len(self.model_timeline) - 1:
                     next_date = self.model_timeline.index[idx + 1]
                     out_of_sample = out_of_sample.loc[out_of_sample.index <= next_date]
-                out_of_sample_data = self._data.loc[out_of_sample.index]
+                out_of_sample_data = self._data.loc[out_of_sample.index, in_sample_data.columns]
                 comp = self.strategy_component(asset_returns=asset_returns,
                                                in_sample_data=in_sample_data,
                                                out_of_sample_data=out_of_sample_data,
@@ -213,9 +213,10 @@ class Sim(object):
         logger.info('Simulating strategy returns')
         self.asset_returns = self.asset_prices.resample('B').last().ffill().diff()
         self.positions = self.position_component(**{'signal': self.signal, 'normalized_signal': self.normalized_signal})
+        start_date = self.start_date if self.start_date > self.positions.first_valid_index() else self.positions.first_valid_index()
         self.strategy_returns = tu.resample(self.positions, self.asset_returns).shift() * self.asset_returns
-        self.strategy_returns = self.strategy_returns[self.positions.first_valid_index():]
-        self.asset_returns = self.asset_returns[self.positions.first_valid_index():]
+        self.strategy_returns = self.strategy_returns[start_date:]
+        self.asset_returns = self.asset_returns[start_date:]
 
     def get_analytics(self):
         logger.info('Calculating analytics')

@@ -145,6 +145,29 @@ def BoostingStump(x, y):
     return pd.concat(ans, axis=0)
 
 
+def get_random_sequence(n_variables, forest_size, seed=0):
+    '''
+    Returns a set of random sequences of variable orders
+    '''
+    np.random.seed(seed)
+    ans = []
+    order = np.arange(n_variables)
+    for i in xrange(forest_size):
+        np.random.shuffle(order)
+        ans.append(order.copy())
+    return ans
+
+
+def RandomBoosting(x, y, forest_size=100):
+    '''
+    Random forest on top of boosting
+    Returns a list of tuples of (randomization, boosting model)
+    '''
+    myx, _ = give_me_pandas_variables(x, y)
+    sequence = get_random_sequence(np.size(myx, 1), forest_size)
+    return [(seq, BoostingStump(x, y)) for seq in sequence]
+    
+    
 # Prediction
 def StumpPrediction(x, c):
     '''
@@ -202,22 +225,36 @@ def BoostingPrediction(x, ans):
         return pd.concat(results, axis=1) 
 
 
-# Strategy Components
-class BoostingStumpComponent(object):
+def RandomBoostingPrediction(x, ans):
     '''
-    Strategy component using boosting stump
+    Prediction with random boosting model
+    '''
+    df_concat = pd.concat([BoostingPrediction(x.iloc[:, seq], model) for seq, model in ans])
+    return df_concat.groupby(df_concat.index).mean()
+    
+
+# Strategy Components
+class Component(object):
+    '''
+    Strategy component
     
     Input
     --------
+    asset_returns
     in_sample_data
     out_of_sample_data
+    model_function
+    prediction_function
     use_score
 
     '''    
-    def __init__(self, asset_returns, in_sample_data, out_of_sample_data, use_scores=False, *args, **kwargs):
+    def __init__(self, asset_returns, in_sample_data, out_of_sample_data, model_function, 
+                 prediction_function, use_scores=False, *args, **kwargs):
         self.asset_returns = asset_returns
         self.in_sample_data = in_sample_data
         self.out_of_sample_data = out_of_sample_data
+        self.model_function = model_function
+        self.prediction_function = prediction_function
         self.use_scores = use_scores
         self.run_model()
 
@@ -239,10 +276,30 @@ class BoostingStumpComponent(object):
         self._z = out_of_sample_data.fillna(out_of_sample_data.median(axis=0))
 
     def estimate_model(self):
-        self.model = BoostingStump(self._x, self._y)
+        self.model = self.model_function(x=self._x, y=self._y)
     
     def calculate_signals(self):
-        in_sample_signal = BoostingPrediction(self._x, self.model)
+        in_sample_signal = self.prediction_function(x=self._x, ans=self.model)
         signal_distribution = pu.get_distribution_parameters(in_sample_signal)
-        self.signal = BoostingPrediction(self._z, self.model)
+        self.signal = self.prediction_function(x=self._z, ans=self.model)
         self.normalized_signal = pu.get_distribution_scores(self.signal, signal_distribution)
+
+
+class BoostingStumpComponent(object):
+    def __init__(self, asset_returns, in_sample_data, out_of_sample_data, use_scores=False):
+        self.core = Component(asset_returns, in_sample_data, out_of_sample_data,
+                              model_function=BoostingStump, prediction_function=BoostingPrediction,
+                              use_scores=use_scores)
+        self.model = self.core.model
+        self.signal = self.core.signal
+        self.normalized_signal = self.core.normalized_signal
+
+
+class RandomBoostingComponent(object):
+    def __init__(self, asset_returns, in_sample_data, out_of_sample_data, use_scores=False):
+        self.core = Component(asset_returns, in_sample_data, out_of_sample_data,
+                              model_function=RandomBoosting, prediction_function=RandomBoostingPrediction,
+                              use_scores=use_scores)
+        self.model = self.core.model
+        self.signal = self.core.signal
+        self.normalized_signal = self.core.normalized_signal
