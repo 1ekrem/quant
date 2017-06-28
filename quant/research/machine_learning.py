@@ -6,7 +6,8 @@ Created on 22 Jun 2017
 import os
 import pandas as pd
 from datetime import datetime as dt
-from quant.lib import timeseries_utils as tu, data_utils as du, portfolio_utils as pu, machine_learning_utils as mu
+from quant.lib import timeseries_utils as tu, data_utils as du, portfolio_utils as pu, \
+    machine_learning_utils as mu, visualization_utils as vu
 
 
 DATABASE_NAME = 'quant'
@@ -156,8 +157,11 @@ def run_signal_spline_study():
                  sample_window=36, model_frequency='Q', inputs=econ,
                  input_data_loader=input_data_loader, strategy_component=strategy_component,
                  position_component=pu.SimpleLongOnly, simulation_name=simulation_name)
-    return sim
-    
+    x = sim.signal.iloc[:, 0].shift()
+    x.name = 'Signal'
+    y = sim._asset_returns.iloc[:, 0]
+    vu.bin_plot(x, y)
+
 
 if __name__ == '__main__':
     _ = run_univariate_econ_boosting()
