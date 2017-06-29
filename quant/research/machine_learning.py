@@ -10,7 +10,6 @@ from datetime import datetime as dt
 from matplotlib import pyplot as plt
 from quant.lib import timeseries_utils as tu, data_utils as du, portfolio_utils as pu, \
     machine_learning_utils as mu, visualization_utils as vu
-from statsmodels.sandbox.tools import cross_val
 
 
 DATABASE_NAME = 'quant'
