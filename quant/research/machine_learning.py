@@ -4,10 +4,13 @@ Created on 22 Jun 2017
 @author: wayne
 '''
 import os
+import numpy as np
 import pandas as pd
 from datetime import datetime as dt
+from matplotlib import pyplot as plt
 from quant.lib import timeseries_utils as tu, data_utils as du, portfolio_utils as pu, \
     machine_learning_utils as mu, visualization_utils as vu
+from statsmodels.sandbox.tools import cross_val
 
 
 DATABASE_NAME = 'quant'
@@ -109,7 +112,7 @@ def run_univariate_econ_boosting():
     return analytics
 
 
-def multivariate_run_one(model, input_type='release'):
+def multivariate_run_one(model, input_type='release', cross_validation=False):
     econ = get_bloomberg_econ_list()
     if input_type == 'release':
         input_data_loader = bloomberg_release_loader
@@ -121,12 +124,17 @@ def multivariate_run_one(model, input_type='release'):
         strategy_component = mu.BoostingStumpComponent
     elif model == 'RandomBoosting':
         strategy_component = mu.RandomBoostingComponent
-    simulation_name = '%s %s' % (model, input_type)
+    simulation_name = '%s %s%s' % (model, input_type, ' CV' if cross_validation else '')
+    if cross_validation:
+        params = dict(cross_validation=True, cross_validation_data_func=mu.pandas_ewma,
+                      cross_validation_params=[{'span': x} for x in np.arange(2, 7)])
+    else:
+        params = {}
     sim = pu.Sim(assets=['SPX Index'], asset_data_loader=load_bloomberg_index_prices,
-                 start_date=dt(2003, 1, 1), end_date=dt(2017, 6, 1), data_frequency='M',
-                 sample_window=36, model_frequency='Q', inputs=econ,
+                 start_date=dt(2005,1, 1), end_date=dt(2017, 6, 1), data_frequency='M',
+                 sample_window=60, model_frequency='Q', inputs=econ,
                  input_data_loader=input_data_loader, strategy_component=strategy_component,
-                 position_component=pu.SimpleLongOnly, simulation_name=simulation_name)
+                 position_component=pu.SimpleLongOnly, simulation_name=simulation_name, **params)
     a = sim.analytics['SPX Index'].iloc[1, :]
     acc = sim.strategy_returns.iloc[:, 0].cumsum()
     acc.name = '%s (mean: %.2f, std: %.2f, sharpe: %.2f)' % (simulation_name, a.loc['mean'], a.loc['std'], a.loc['sharpe'])
@@ -138,29 +146,50 @@ def multivariate_run_one(model, input_type='release'):
 
 def run_multivariate_econ_boosting():
     accs = []
-    for model in ['RandomBoosting', 'Boosting']:
+    for model in ['Boosting']:
         for input_type in ['release', 'change', 'revision']:
-            acc, acc0 = multivariate_run_one(model, input_type)
-            if len(accs) == 0:
-                accs.append(acc0)
-            accs.append(acc)
+            for cv in [True, False]:
+                acc, acc0 = multivariate_run_one(model, input_type, cv)
+                if len(accs) == 0:
+                    accs.append(acc0)
+                accs.append(acc)
     return pd.concat(accs, axis=1)
 
 
 def run_signal_spline_study():
     econ = get_bloomberg_econ_list()
     input_data_loader = bloomberg_release_loader
-    strategy_component = mu.BoostingStumpComponent
+    strategy_component = mu.RandomBoostingComponent
     simulation_name = 'boosting release'
     sim = pu.Sim(assets=['SPX Index'], asset_data_loader=load_bloomberg_index_prices,
-                 start_date=dt(2003, 1, 1), end_date=dt(2017, 6, 1), data_frequency='M',
-                 sample_window=36, model_frequency='Q', inputs=econ,
+                 start_date=dt(2005, 1, 1), end_date=dt(2017, 6, 1), data_frequency='M',
+                 sample_window=60, model_frequency='Q', inputs=econ,
                  input_data_loader=input_data_loader, strategy_component=strategy_component,
                  position_component=pu.SimpleLongOnly, simulation_name=simulation_name)
     x = sim.signal.iloc[:, 0].shift()
     x.name = 'Signal'
     y = sim._asset_returns.iloc[:, 0]
+    plt.figure()
     vu.bin_plot(x, y)
+    x2 = sim.normalized_signal.iloc[:, 0].shift()
+    x.name = 'Normalized Signal'
+    plt.figure()
+    vu.bin_plot(x2, y)
+
+
+def cross_validation_test_case():
+    econ = get_bloomberg_econ_list()
+    input_data_loader = bloomberg_release_loader
+    strategy_component = mu.BoostingStumpComponent
+    simulation_name = 'boosting release'
+    sim = pu.Sim(assets=['SPX Index'], asset_data_loader=load_bloomberg_index_prices,
+                 start_date=dt(2005, 1, 1), end_date=dt(2017, 6, 1), data_frequency='M',
+                 sample_window=60, model_frequency='Q', inputs=econ,
+                 input_data_loader=input_data_loader, strategy_component=strategy_component,
+                 position_component=pu.SimpleLongOnly, simulation_name=simulation_name,
+                 cross_validation=True, cross_validation_data_func=mu.pandas_ewma,
+                 cross_validation_params=[{'span': x} for x in np.arange(2, 10)])
+    return sim
 
 
 if __name__ == '__main__':

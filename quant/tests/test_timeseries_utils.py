@@ -14,6 +14,10 @@ b = pd.DataFrame([[0., 1.], [2., 3.]], index=[dt(2010,1,1), dt(2010,1,15)], colu
 c = pd.Series([1., 1.], index=[dt(2010,1,1), dt(2010,1,15)])
 d = pd.Series([1., np.nan], index=[dt(2010,1,1), dt(2010,1,15)])
 x = np.arange(3)
+TONE = pd.DataFrame(np.ones((5, 2)))
+TPARAMS = pd.DataFrame([[1., 3., 2.]] * 2, columns=['mean', 'median', 'std'])
+TTWO = TONE.copy()
+TTWO.iloc[:, 1] = np.nan
 
 
 class TestResample(unittest.TestCase):
@@ -29,6 +33,15 @@ class TestResample(unittest.TestCase):
 
     def testResampleWithoutForefilling(self):
         self.assertTrue(d.equals(tu.resample(a, b, False)))
+
+
+class TestGetDistributionScores(unittest.TestCase):
+    
+    def testCalculation(self):
+        self.assertTrue((.5 * TONE).equals(tu.get_distribution_scores(TONE, TPARAMS)))
+
+    def testDealWithNans(self):
+        self.assertTrue((.5 * TTWO).equals(tu.get_distribution_scores(TTWO, TPARAMS)))
 
 
 if __name__ == "__main__":

@@ -6,10 +6,10 @@ Created on 25 Jun 2017
 
 import numpy as np
 import pandas as pd
-from scipy import stats as ss
 from datetime import datetime as dt, timedelta
 from quant.lib import timeseries_utils as tu
 from quant.lib.main_utils import logger
+from quant.lib.machine_learning_utils import get_random_sequence, StumpError
 
 
 def get_timeline(start_date, end_date, frequency, sample_window=None):
@@ -58,26 +58,17 @@ def ignore_insufficient_series(data, min_size):
     return None if ans.empty else ans
 
 
-def get_distribution_parameters(data):
-    '''
-    Mean, std and medians of series
-    '''
-    assert isinstance(data, pd.DataFrame)
-    ans = pd.concat([data.mean(axis=0), data.median(axis=0), data.std(axis=0)], axis=1)
-    ans.columns = ['mean', 'median', 'std']
+def get_cross_validation_buckets(data_size, buckets):
+    seq = get_random_sequence(data_size, 1)[0]
+    step_size = 1. * data_size / buckets
+    ans = []
+    for i in xrange(buckets):
+        lower = np.int(np.round(i * step_size))
+        upper = np.int(np.round((i+1) * step_size)) if i < buckets - 1 else data_size
+        ans.append(seq[lower:upper])
     return ans
 
-
-def get_distribution_scores(data, params):
-    '''
-    Converts data into distribution scores
-    '''
-    ans = (data - params['mean']) / params['std']
-    ans.loc[:, :] = ss.norm.cdf(ans.values)
-    ans[data.isnull()] = np.nan
-    return ans
-
-
+        
 # portfolio components
 def SimpleLongOnly(signal, *args, **kwargs):
     '''
@@ -135,7 +126,9 @@ class Sim(object):
     '''
     def __init__(self, start_date, end_date, data_frequency, model_frequency, sample_window,
                  assets, asset_data_loader, inputs, input_data_loader, strategy_component,
-                 position_component, simulation_name, data_missing_pass=0.7):
+                 position_component, simulation_name, data_missing_pass=0.7,
+                 cross_validation=False, cross_validation_data_func=None, cross_validation_params=None,
+                 cross_validation_buckets=5):
         self.simulation_name = simulation_name
         self.assets = assets
         self.asset_data_loader = asset_data_loader
@@ -149,6 +142,10 @@ class Sim(object):
         self.strategy_component = strategy_component
         self.position_component = position_component
         self.data_missing_pass = data_missing_pass
+        self.cross_validation = cross_validation
+        self.cross_validation_data_func = cross_validation_data_func
+        self.cross_validation_params = cross_validation_params
+        self.cross_validation_buckets = cross_validation_buckets
         self.run_sim()
 
     def run_sim(self):
@@ -156,6 +153,7 @@ class Sim(object):
         self.get_timeline()
         self.load_asset_prices()
         self.load_input_data()
+        self.create_estimation_dataset()
         self.run_simulation_sequence()
         self.calculate_returns()
         self.get_analytics()
@@ -175,9 +173,47 @@ class Sim(object):
         logger.info('Loading input data')
         self.dataset = self.input_data_loader(self.inputs, start_date=self._load_start, end_date=self._load_end)
 
-    def run_simulation_sequence(self):
-        self._data = pd.concat([tu.resample(self.dataset[ticker], self.timeline) for ticker in self.inputs], axis=1)
+    def create_estimation_dataset(self):
         self._asset_returns = tu.resample(self.asset_prices, self.timeline).diff()
+        data = pd.concat([tu.resample(self.dataset[ticker], self.timeline) for ticker in self.inputs], axis=1)
+        self._data = data
+        if self.cross_validation:
+            self._validation_data = [self.cross_validation_data_func(data, **param) for param in self.cross_validation_params]
+
+    def estimate_model(self, asset_returns, in_sample_data, out_of_sample_data):
+        return self.strategy_component(asset_returns=asset_returns,
+                                       in_sample_data=in_sample_data,
+                                       out_of_sample_data=out_of_sample_data)
+
+    def run_without_cross_validation(self, asset_returns, in_sample_data, out_of_sample_data):
+        return self.estimate_model(asset_returns, in_sample_data, out_of_sample_data)
+
+    def run_cross_validation(self, asset_returns, in_sample_data, out_of_sample_data):
+        '''
+        in_sample_data and out_of_sample_data are datasets
+        '''
+        seq = get_cross_validation_buckets(len(asset_returns), self.cross_validation_buckets)
+        selection = None
+        error_rate = 1.
+        for i in xrange(len(in_sample_data)):
+            validation_universe = in_sample_data[i]
+            errors = []
+            for j in xrange(self.cross_validation_buckets):
+                bucket = seq[j]
+                validation_returns = asset_returns.iloc[bucket]
+                estimation_returns = asset_returns.loc[~asset_returns.index.isin(validation_returns.index)]
+                validation_data = validation_universe.loc[validation_returns.index]
+                estimation_data = validation_universe.loc[estimation_returns.index]
+                model = self.estimate_model(estimation_returns, estimation_data, validation_data)
+                iteration_error = StumpError(model.signal.iloc[:, 0], validation_returns.iloc[:, 0], 0.)
+                errors.append(iteration_error)
+            errors = np.mean(errors)
+            if errors < error_rate:
+                error_rate = errors
+                selection = i
+        return selection, self.estimate_model(asset_returns, in_sample_data[selection], out_of_sample_data[selection])
+        
+    def run_simulation_sequence(self):
         self.models = []
         self.signal = []
         self.normalized_signal = []
@@ -198,9 +234,14 @@ class Sim(object):
                     next_date = self.model_timeline.index[idx + 1]
                     out_of_sample = out_of_sample.loc[out_of_sample.index <= next_date]
                 out_of_sample_data = self._data.loc[out_of_sample.index, in_sample_data.columns]
-                comp = self.strategy_component(asset_returns=asset_returns,
-                                               in_sample_data=in_sample_data,
-                                               out_of_sample_data=out_of_sample_data)
+                
+                if self.cross_validation:
+                    in_sample_dataset = [x.loc[in_sample_data.index, in_sample_data.columns] for x in self._validation_data]
+                    out_of_sample_dataset = [x.loc[out_of_sample_data.index, out_of_sample_data.columns] for x in self._validation_data]                    
+                    selection, comp = self.run_cross_validation(asset_returns, in_sample_dataset, out_of_sample_dataset)
+                    logger.info('Cross validation found solution at %s' % str(self.cross_validation_params[selection]))
+                else:
+                    comp = self.run_without_cross_validation(asset_returns, in_sample_data, out_of_sample_data)
                 self.models.append((model_time, comp.model))
                 self.signal.append(comp.signal)
                 self.normalized_signal.append(comp.normalized_signal)

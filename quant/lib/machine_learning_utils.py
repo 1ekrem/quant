@@ -5,7 +5,7 @@ Created on 23 Jun 2017
 '''
 import numpy as np
 import pandas as pd
-from quant.lib import portfolio_utils as pu
+from quant.lib import timeseries_utils as tu
 from quant.lib.main_utils import logger
 
 MINIMUM_ERROR = 1e-4
@@ -32,6 +32,10 @@ def give_me_pandas_variables(x, y):
     
     assert len(x) == len(y)
     return myx.fillna(0.), myy.fillna(0.)
+
+
+def pandas_ewma(data, span):
+    return data.ewm(span=span, ignore_na=True).mean()
 
 
 # Boosting
@@ -158,7 +162,7 @@ def get_random_sequence(n_variables, forest_size, seed=0):
     return ans
 
 
-def RandomBoosting(x, y, forest_size=100):
+def RandomBoosting(x, y, forest_size=50):
     '''
     Random forest on top of boosting
     Returns a list of tuples of (randomization, boosting model)
@@ -263,7 +267,7 @@ class Component(object):
         self.calculate_signals()
     
     def prepare_data(self):
-        self.distribution_params = pu.get_distribution_parameters(self.in_sample_data)
+        self.distribution_params = tu.get_distribution_parameters(self.in_sample_data)
         in_sample_data = self.in_sample_data
         out_of_sample_data = self.out_of_sample_data
         self._x = in_sample_data.fillna(in_sample_data.median(axis=0))
@@ -275,9 +279,9 @@ class Component(object):
     
     def calculate_signals(self):
         in_sample_signal = self.prediction_function(x=self._x, ans=self.model)
-        signal_distribution = pu.get_distribution_parameters(in_sample_signal)
+        signal_distribution = tu.get_distribution_parameters(in_sample_signal)
         self.signal = self.prediction_function(x=self._z, ans=self.model)
-        self.normalized_signal = pu.get_distribution_scores(self.signal, signal_distribution)
+        self.normalized_signal = tu.get_distribution_scores(self.signal, signal_distribution)
 
 
 class BoostingStumpComponent(object):

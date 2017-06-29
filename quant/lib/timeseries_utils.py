@@ -5,6 +5,7 @@ Created on Jun 1, 2017
 '''
 import pandas as pd
 import numpy as np
+from scipy import stats as ss
 from quant.lib import data_utils as du
 
 
@@ -33,3 +34,23 @@ def store_timeseries(ts, database_name, table_name):
 
 def get_timeseries(database_name, table_name, index_range=None, column_list=None):
     return du.pandas_read(database_name, table_name, du.TIMESERIES_COLUMN_NAME, du.TIMESERIES_INDEX_NAME, du.TIMESERIES_VALUE_NAME, index_range, column_list)
+
+
+def get_distribution_parameters(data):
+    '''
+    Mean, std and medians of series
+    '''
+    assert isinstance(data, pd.DataFrame)
+    ans = pd.concat([data.mean(axis=0), data.median(axis=0), data.std(axis=0)], axis=1)
+    ans.columns = ['mean', 'median', 'std']
+    return ans
+
+
+def get_distribution_scores(data, params):
+    '''
+    Converts data into distribution scores
+    '''
+    ans = (data - params['mean']) / params['std']
+    ans.loc[:, :] = ss.norm.cdf(ans.values)
+    ans[data.isnull()] = np.nan
+    return ans
