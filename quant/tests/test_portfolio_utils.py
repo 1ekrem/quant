@@ -20,6 +20,8 @@ TDF = pd.DataFrame(np.tril(np.ones((5, 5))))
 TDF[TDF <= 0] = np.nan
 TSIG = pd.Series(np.arange(5) - 2.).to_frame()
 TPRT = pd.Series([0., 0., 0., 1., 1.]).to_frame()
+TSIG2 = pd.Series(.5 * np.arange(5) - 1.).to_frame()
+TPRT2 = pd.Series([1., 0., 1., 1., 1.]).to_frame()
 
 
 class TestGetTimeline(unittest.TestCase):

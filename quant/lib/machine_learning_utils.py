@@ -90,19 +90,20 @@ def get_weight_from_error(e):
     return .5 * np.log((1. - e + MINIMUM_ERROR) / (e + MINIMUM_ERROR))
 
     
-def estimate_boosting_stump(x, y):
+def estimate_boosting_stump(x, y, estimate_intercept=False):
     '''
     Estimating boosting stump for one target variable
     '''
     ans = []
     alpha = np.repeat(1. / len(y), len(y))
-    pred = x.iloc[:, 0]
-    e = StumpError(pred, y * alpha, np.min(pred))
-    w = get_weight_from_error(e)
-    alpha[y < 0] *= np.exp(w)
-    alpha[y > 0] *= np.exp(-w)
-    alpha /= np.sum(alpha)
-    ans.append([BOOSTING_INTERCEPT, y.name, np.nan, w])
+    if estimate_intercept:
+        pred = x.iloc[:, 0]
+        e = StumpError(pred, y * alpha, np.min(pred))
+        w = get_weight_from_error(e)
+        alpha[y < 0] *= np.exp(w)
+        alpha[y > 0] *= np.exp(-w)
+        alpha /= np.sum(alpha)
+        ans.append([BOOSTING_INTERCEPT, y.name, np.nan, w])
     for i in np.arange(np.size(x, 1)):
         pred = x.iloc[:, i]
         u = DummyStump(pred, y * alpha)
@@ -117,14 +118,15 @@ def estimate_boosting_stump(x, y):
     return pd.DataFrame(ans, columns=['predicative', 'target', 'estimation', 'weight'])
 
 
-def BoostingStump(x, y):
+def BoostingStump(x, y, estimate_intercept=False):
     '''
     Boosting stump with Pandas variables
     
     Input
     --------
-    x    Pandas DataFrame or Series of predictive variables
-    y    Pandas DataFrame or Series of target variables
+    x                     Pandas DataFrame or Series of predictive variables
+    y                     Pandas DataFrame or Series of target variables
+    estimate_intercept    Boolean
 
     Output
     --------
@@ -143,7 +145,7 @@ def BoostingStump(x, y):
     ans = []
     for i in xrange(np.size(myy, 1)):
         try:
-            ans.append(estimate_boosting_stump(myx, myy.iloc[:, i]))
+            ans.append(estimate_boosting_stump(myx, myy.iloc[:, i], estimate_intercept))
         except Exception as e:
             logger.warning('Boosting stump failed at variable %s: %s' % (str(myy.columns[i]), str(e)))
     return pd.concat(ans, axis=0)
@@ -162,14 +164,14 @@ def get_random_sequence(n_variables, forest_size, seed=0):
     return ans
 
 
-def RandomBoosting(x, y, forest_size=50):
+def RandomBoosting(x, y, forest_size=100, estimate_intercept=False):
     '''
     Random forest on top of boosting
     Returns a list of tuples of (randomization, boosting model)
     '''
     myx, _ = give_me_pandas_variables(x, y)
     sequence = get_random_sequence(np.size(myx, 1), forest_size)
-    return [(seq, BoostingStump(x.iloc[:, seq], y)) for seq in sequence]
+    return [(seq, BoostingStump(x.iloc[:, seq], y, estimate_intercept)) for seq in sequence]
     
     
 # Prediction
