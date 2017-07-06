@@ -20,7 +20,21 @@ FREDKEY = 'ff64294203f79127f8d004d2726386ac'
 _api = fredapi.Fred(api_key=FREDKEY)
 
 # data config
-US_ECON = ['GDP']
+US_ECON = [# National income
+           'GDP', 'GDPC1',
+           # Interest rates
+           'GS10', 'GS5', 'GS2', 'GS1', 'MORTGAGE30US', 'FF', 'DTB3', 'FEDFUNDS',
+           # Current population survey
+           'UNRATE',
+           # Housing
+           'HOUST', 'HOUST1F',
+           # Industrial production
+           'INDPRO',
+           # Transportation
+           'RAILFRTINTERMODAL',
+           # Corporate bond yield
+           'AAA', 'BAA',
+           ]
 US_SERIES = ['SP500']
 
 # utils
@@ -58,7 +72,7 @@ def load_series_all_releases(series_name):
 
 
 def _encode_string(s):
-    return s.encode('utf-8')[:1000]
+    return s.encode('utf-8').replace('"', "'")[:1000]
 
 
 def store_series_info(data, series_name):

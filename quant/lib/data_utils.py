@@ -33,7 +33,7 @@ def _series_to_insert_sql(s):
     data = s.dropna().astype('str')
     if isinstance(data.index, pd.DatetimeIndex):
         data.index = data.index.strftime(DATETIME_FORMAT)
-    return ', '.join(["('%s', '%s', '%s')" % (k, name, v) for k, v in data.to_dict().iteritems()])
+    return ', '.join(['''("%s", "%s", "%s")''' % (k, name, v) for k, v in data.to_dict().iteritems()])
 
 
 def _series_to_delete_sql(s):
@@ -41,7 +41,7 @@ def _series_to_delete_sql(s):
     data = s.dropna().astype('str')
     if isinstance(data.index, pd.DatetimeIndex):
         data.index = data.index.strftime(DATETIME_FORMAT)
-    return ', '.join(["('%s', '%s')" % (k, name) for k in data.index])
+    return ', '.join(['''("%s", "%s")''' % (k, name) for k in data.index])
 
 
 def get_insert_sql_from_pandas(data):
