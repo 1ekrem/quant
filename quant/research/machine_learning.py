@@ -198,13 +198,15 @@ class EconSim(object):
     '''
     def __init__(self, start_date, end_date, sample_date, data_frequency, assets, asset_data_loader,
                  inputs, input_data_loader, strategy_component, position_component, simulation_name,
-                 cross_validation=False, cross_validation_data_func=None, cross_validation_params=None,
-                 cross_validation_buckets=5):
+                 data_transform_func=None, data_missing_fail=0.5, cross_validation=False,
+                 cross_validation_params=None, cross_validation_buckets=5):
         self.simulation_name = simulation_name
         self.assets = assets
         self.asset_data_loader = asset_data_loader
         self.inputs = inputs
         self.input_data_loader = input_data_loader
+        self.data_transform_func = data_transform_func
+        self.data_missing_fail = data_missing_fail
         self.start_date = start_date
         self.end_date = end_date
         self.sample_date = sample_date
@@ -212,7 +214,6 @@ class EconSim(object):
         self.strategy_component = strategy_component
         self.position_component = position_component
         self.cross_validation = cross_validation
-        self.cross_validation_data_func = cross_validation_data_func
         self.cross_validation_params = cross_validation_params
         self.cross_validation_buckets = cross_validation_buckets
         self.run_sim()
@@ -222,7 +223,6 @@ class EconSim(object):
         self.get_timeline()
         self.load_asset_prices()
         self.load_input_data()
-        self.create_estimation_dataset()
         self.run_simulation_sequence()
         self.calculate_returns()
         self.get_analytics()
@@ -236,69 +236,79 @@ class EconSim(object):
     def load_asset_prices(self):
         logger.info('Loading asset prices')
         self.asset_prices = self.asset_data_loader(self.assets, start_date=self._load_start, end_date=self._load_end)
+        self._asset_returns = tu.resample(self.asset_prices, self.timeline).diff()
 
     def load_input_data(self):
         logger.info('Loading input data')
         self.dataset = self.input_data_loader(self.inputs, start_date=self._load_start, end_date=self._load_end)
 
-    def create_estimation_dataset(self):
-        self._asset_returns = tu.resample(self.asset_prices, self.timeline).diff()
-        data = pd.concat([tu.resample(self.dataset[ticker], self.timeline) for ticker in self.inputs], axis=1)
-        self._data = data
-        if self.cross_validation:
-            self._validation_data = [self.cross_validation_data_func(data, **param) for param in self.cross_validation_params]
+    def create_estimation_data(self, param=None):
+        ans = []
+        if param is None:
+            param = {}
+        for ticker in self.inputs:
+            data = self.dataset[ticker]
+            if self.data_transform_func is not None:
+                data = self.data_transform_func(data, **param)
+            ans.append(tu.resample(data, self.timeline))
+        return pd.concat(ans, axis=1)
 
-    def estimate_model(self, asset_returns, in_sample_data, out_of_sample_data):
-        return self.strategy_component(asset_returns=asset_returns,
-                                       in_sample_data=in_sample_data,
-                                       out_of_sample_data=out_of_sample_data)
+    def estimate_model(self, in_sample, out_of_sample, params=None):
+        if params is None:
+            params = {}
+        data = self.create_estimation_data(params)
+        asset_returns = self._asset_returns.loc[in_sample.index]
+        in_sample_data = pu.ignore_insufficient_series(data.loc[in_sample.index], len(in_sample) * self.data_missing_fail)
+        if in_sample_data is None:
+            return None
+        else:
+            out_of_sample_data = data.loc[out_of_sample.index, in_sample_data.columns]
+            return self.strategy_component(asset_returns=asset_returns,
+                                           in_sample_data=in_sample_data,
+                                           out_of_sample_data=out_of_sample_data, params=params)
 
-    def run_without_cross_validation(self, asset_returns, in_sample_data, out_of_sample_data):
-        return self.estimate_model(asset_returns, in_sample_data, out_of_sample_data)
+    def run_without_cross_validation(self, in_sample, out_of_sample):
+        return self.estimate_model(in_sample, out_of_sample)
 
-    def run_cross_validation(self, asset_returns, in_sample_data, out_of_sample_data):
-        '''
-        in_sample_data and out_of_sample_data are datasets
-        '''
-        seq = pu.get_cross_validation_buckets(len(asset_returns), self.cross_validation_buckets)
+    def run_cross_validation(self, in_sample, out_of_sample):
+        seq = pu.get_cross_validation_buckets(len(in_sample), self.cross_validation_buckets)
         selection = None
-        error_rate = 1.
-        for i in xrange(len(in_sample_data)):
-            validation_universe = in_sample_data[i]
+        error_rate = 100.
+        for param in self.cross_validation_params:
             errors = []
             for j in xrange(self.cross_validation_buckets):
                 bucket = seq[j]
-                validation_returns = asset_returns.iloc[bucket]
-                estimation_returns = asset_returns.loc[~asset_returns.index.isin(validation_returns.index)]
-                validation_data = validation_universe.loc[validation_returns.index]
-                estimation_data = validation_universe.loc[estimation_returns.index]
-                model = self.estimate_model(estimation_returns, estimation_data, validation_data)
-                iteration_error = mu.StumpError(model.signal.iloc[:, 0], validation_returns.iloc[:, 0], 0.)
-                errors.append(iteration_error)
+                validation = in_sample.iloc[bucket]
+                estimation = in_sample.loc[~in_sample.index.isin(validation.index)]
+                validation_returns = self._asset_returns.loc[validation.index]
+                model = self.estimate_model(estimation, validation, param)
+                if model is not None:
+                    iteration_error = mu.StumpError(model.signal.iloc[:, 0], validation_returns.iloc[:, 0], 0.)
+                    errors.append(iteration_error)
             errors = np.mean(errors)
             if errors < error_rate:
                 error_rate = errors
-                selection = i
-        return selection, self.estimate_model(asset_returns, in_sample_data[selection], out_of_sample_data[selection])
+                selection = param
+        if selection is None:
+            return None, None, None
+        else:
+            return selection, self.estimate_model(in_sample, out_of_sample, selection), error_rate
         
     def run_simulation_sequence(self):
         in_sample = self.timeline.copy()
         in_sample = in_sample.loc[in_sample.index <= self.sample_date]
-        in_sample_data = pu.ignore_insufficient_series(self._data.loc[in_sample.index], 20)
-        asset_returns = self._asset_returns.loc[in_sample.index]
-        if in_sample_data is None:
-            logger.info('Insufficient Data')
+        out_of_sample = self.timeline.copy()
+        if self.cross_validation:
+            selection, comp, error_rate = self.run_cross_validation(in_sample, out_of_sample)
+            if selection is not None:
+                logger.info('Error rate %.1f%% at %s' % (100. * error_rate, str(selection)))
+                self.selection = selection
+                self.error_rate = error_rate
         else:
-            logger.info('Running model')
-            out_of_sample = self.timeline.copy()
-            out_of_sample_data = self._data.loc[out_of_sample.index, in_sample_data.columns]
-            if self.cross_validation:
-                in_sample_dataset = [x.loc[in_sample_data.index, in_sample_data.columns] for x in self._validation_data]
-                out_of_sample_dataset = [x.loc[out_of_sample_data.index, out_of_sample_data.columns] for x in self._validation_data]                    
-                selection, comp = self.run_cross_validation(asset_returns, in_sample_dataset, out_of_sample_dataset)
-                logger.info('Cross validation found solution at %s' % str(self.cross_validation_params[selection]))
-            else:
-                comp = self.run_without_cross_validation(asset_returns, in_sample_data, out_of_sample_data)
+            comp = self.run_without_cross_validation(in_sample, out_of_sample)
+        if comp is None:
+            logger.info('Insufficient data, ignored')
+        else:
             self.model = comp.model
             self.signal = comp.signal
             self.normalized_signal = comp.normalized_signal
@@ -335,15 +345,16 @@ def econ_run_one(model, input_type='release', cross_validation=False):
         strategy_component = mu.RandomBoostingComponent
     simulation_name = '%s %s%s' % (model, input_type, ' CV' if cross_validation else '')
     if cross_validation:
-        params = dict(cross_validation=True, cross_validation_data_func=mu.pandas_ewma,
-                      cross_validation_params=[{'span': x} for x in np.arange(2, 13)],
+        params = dict(cross_validation=True,
+                      cross_validation_params=[{}] + [{'no_of_variables': x} for x in np.arange(10, 20)],
                       cross_validation_buckets=5)
     else:
         params = {}
     sim = EconSim(assets=['SPX Index'], asset_data_loader=load_bloomberg_index_prices,
                  start_date=dt(2000,1, 1), end_date=dt(2017, 6, 1), sample_date=dt(2010, 1,1), data_frequency='M',
                  inputs=econ, input_data_loader=input_data_loader, strategy_component=strategy_component,
-                 position_component=pu.SimpleLongOnly, simulation_name=simulation_name, **params)
+                 position_component=pu.SimpleLongOnly, simulation_name=simulation_name,
+                 data_transform_func=None, **params)
     a = sim.analytics['SPX Index'].iloc[1, :]
     acc = sim.strategy_returns.iloc[:, 0].cumsum()
     acc.name = '%s (mean: %.2f, std: %.2f, sharpe: %.2f)' % (simulation_name, a.loc['mean'], a.loc['std'], a.loc['sharpe'])

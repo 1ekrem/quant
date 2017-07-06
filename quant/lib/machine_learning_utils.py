@@ -34,8 +34,14 @@ def give_me_pandas_variables(x, y):
     return myx.fillna(0.), myy.fillna(0.)
 
 
-def pandas_ewma(data, span):
-    return data.ewm(span=span, ignore_na=True).mean()
+def pandas_ewma(data, span=2):
+    return data.ewm(span=span if span >=1. else 1., ignore_na=True).mean()
+
+
+def pandas_weeks_ewma(data, span=2):
+    df = data.index.to_series().diff().dropna().mean()
+    es = 7. * span / df.days
+    return data.ewm(span=es if es >= 1. else 1., ignore_na=True).mean() 
 
 
 # Boosting
@@ -103,7 +109,7 @@ def estimate_boosting_stump(x, y, estimate_intercept=False):
         alpha[y < 0] *= np.exp(w)
         alpha[y > 0] *= np.exp(-w)
         alpha /= np.sum(alpha)
-        ans.append([BOOSTING_INTERCEPT, y.name, np.nan, w])
+        ans.append([BOOSTING_INTERCEPT, y.name, np.nan, e, w])
     for i in np.arange(np.size(x, 1)):
         pred = x.iloc[:, i]
         u = DummyStump(pred, y * alpha)
@@ -114,11 +120,11 @@ def estimate_boosting_stump(x, y, estimate_intercept=False):
         alpha[(pred < u) & (y < 0)] *= np.exp(-w)
         alpha[(pred > u) & (y > 0)] *= np.exp(-w)
         alpha /= np.sum(alpha)
-        ans.append([pred.name, y.name, u, w])
-    return pd.DataFrame(ans, columns=['predicative', 'target', 'estimation', 'weight'])
+        ans.append([pred.name, y.name, u, e, w])
+    return pd.DataFrame(ans, columns=['predicative', 'target', 'estimation', 'Error', 'weight'])
 
 
-def BoostingStump(x, y, estimate_intercept=False):
+def BoostingStump(x, y, estimate_intercept=False, no_of_variables=None, *args, **kwargs):
     '''
     Boosting stump with Pandas variables
     
@@ -127,6 +133,7 @@ def BoostingStump(x, y, estimate_intercept=False):
     x                     Pandas DataFrame or Series of predictive variables
     y                     Pandas DataFrame or Series of target variables
     estimate_intercept    Boolean
+    no_of_variables       integer, the number of variables to use
 
     Output
     --------
@@ -142,6 +149,9 @@ def BoostingStump(x, y, estimate_intercept=False):
 
     '''
     myx, myy = give_me_pandas_variables(x, y)
+    if no_of_variables is not None:
+        if np.size(myx, 1) > no_of_variables:
+            myx = myx.iloc[:, :no_of_variables]
     ans = []
     for i in xrange(np.size(myy, 1)):
         try:
@@ -164,14 +174,14 @@ def get_random_sequence(n_variables, forest_size, seed=0):
     return ans
 
 
-def RandomBoosting(x, y, forest_size=100, estimate_intercept=False):
+def RandomBoosting(x, y, forest_size=100, estimate_intercept=False, no_of_variables=None, *args, **kwargs):
     '''
     Random forest on top of boosting
     Returns a list of tuples of (randomization, boosting model)
     '''
     myx, _ = give_me_pandas_variables(x, y)
     sequence = get_random_sequence(np.size(myx, 1), forest_size)
-    return [(seq, BoostingStump(x.iloc[:, seq], y, estimate_intercept)) for seq in sequence]
+    return [(seq, BoostingStump(x.iloc[:, seq], y, estimate_intercept, no_of_variables)) for seq in sequence]
     
     
 # Prediction
@@ -255,12 +265,13 @@ class Component(object):
 
     '''    
     def __init__(self, asset_returns, in_sample_data, out_of_sample_data, model_function, 
-                 prediction_function, *args, **kwargs):
+                 prediction_function, params=None):
         self.asset_returns = asset_returns
         self.in_sample_data = in_sample_data
         self.out_of_sample_data = out_of_sample_data
         self.model_function = model_function
         self.prediction_function = prediction_function
+        self.params = {} if params is None else params
         self.run_model()
 
     def run_model(self):
@@ -277,7 +288,7 @@ class Component(object):
         self._z = out_of_sample_data.fillna(out_of_sample_data.median(axis=0))
 
     def estimate_model(self):
-        self.model = self.model_function(x=self._x, y=self._y)
+        self.model = self.model_function(x=self._x, y=self._y, **self.params)
     
     def calculate_signals(self):
         in_sample_signal = self.prediction_function(x=self._x, ans=self.model)
@@ -287,18 +298,20 @@ class Component(object):
 
 
 class BoostingStumpComponent(object):
-    def __init__(self, asset_returns, in_sample_data, out_of_sample_data):
+    def __init__(self, asset_returns, in_sample_data, out_of_sample_data, params=None):
         self.core = Component(asset_returns, in_sample_data, out_of_sample_data,
-                              model_function=BoostingStump, prediction_function=BoostingPrediction)
+                              model_function=BoostingStump, prediction_function=BoostingPrediction,
+                              params=params)
         self.model = self.core.model
         self.signal = self.core.signal
         self.normalized_signal = self.core.normalized_signal
 
 
 class RandomBoostingComponent(object):
-    def __init__(self, asset_returns, in_sample_data, out_of_sample_data):
+    def __init__(self, asset_returns, in_sample_data, out_of_sample_data, params=None):
         self.core = Component(asset_returns, in_sample_data, out_of_sample_data,
-                              model_function=RandomBoosting, prediction_function=RandomBoostingPrediction)
+                              model_function=RandomBoosting, prediction_function=RandomBoostingPrediction,
+                              params=params)
         self.model = self.core.model
         self.signal = self.core.signal
         self.normalized_signal = self.core.normalized_signal
