@@ -11,7 +11,8 @@ from datetime import datetime as dt
 
 # Database info
 HOST = 'localhost'
-USER = 'wayne'
+#USER = 'wayne'
+USER = 'root'
 PASSWORD = ''
 
 # SQL COMMANDS
@@ -144,11 +145,15 @@ def execute_sql_output_script(database_name, scripts):
             return False, e
 
 
-def create_timeseries_table(database_name, table_name):
-    script = CREATE_TABLE_IF_NOT_EXISTS % (table_name, TIMESERIES_TABLE_FORMAT)
+def create_table(database_name, table_name, table_format):
+    script = CREATE_TABLE_IF_NOT_EXISTS % (table_name, table_format)
     e = execute_sql_input_script(database_name, script)
     if e is not None:
         logger.warning('Failed to create table: ' + str(e))
+
+
+def create_timeseries_table(database_name, table_name):
+    create_table(database_name, table_name, TIMESERIES_TABLE_FORMAT)
 
 
 def pandas_bulk_insert(data, database_name, table_name, column_name, index_name, value_name):
