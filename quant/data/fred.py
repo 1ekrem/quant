@@ -20,22 +20,38 @@ FREDKEY = 'ff64294203f79127f8d004d2726386ac'
 _api = fredapi.Fred(api_key=FREDKEY)
 
 # data config
-US_ECON = [# National income
+US_ECON = [# Economic indicator
+           'CPIAUCSL', 'T10YIE', 'T5YIFR', 'PAYEMS', 'USSLIND',
+           # National income
            'GDP', 'GDPC1',
            # Interest rates
-           'GS10', 'GS5', 'GS2', 'GS1', 'MORTGAGE30US', 'FF', 'DTB3', 'FEDFUNDS',
+           'WGS10YR', 'WGS5YR', 'WGS2YR', 'WGS1YR', 'MORTGAGE30US', 'FF', 'DTB3', 'FEDFUNDS', 'T10Y2Y',
+           'USD3MTD156N', 'USD1MTD156N', 'BAMLH0A0HYM2EY', 'TEDRATE',
            # Current population survey
            'UNRATE',
            # Housing
-           'HOUST', 'HOUST1F',
+           'HOUST', 'HOUST1F', 'CSUSHPINSA',
            # Industrial production
            'INDPRO',
            # Transportation
            'RAILFRTINTERMODAL',
            # Corporate bond yield
-           'AAA', 'BAA',
+           'WAAA', 'WBAA',
+           # Risk indicator
+           'DRSFRMACBS', 'BAMLH0A0HYM2',
            ]
-US_SERIES = ['SP500']
+EU_ECON = [# Interest rates
+           'IRLTLT01DEM156N',
+           ]
+CHINA_ECON = [# Economic indicator
+              'CHNCPIALLMINMEI'
+              ]
+US_SERIES = [# Stock
+             'SP500', 'NASDAQCOM',
+             # FX
+             'DEXUSEU', 'DEXUSUK', 'DEXUSNZ', 'DEXUSAL', 'DEXJPUS',
+             # Commodities
+             'DCOILWTICO']
 
 # utils
 def create_tables():
@@ -183,7 +199,7 @@ def get_series_all_release(series_name, start_date=None, end_date=None):
 
 
 def download_all_releases():
-    for series_name in US_ECON:
+    for series_name in US_ECON + CHINA_ECON + EU_ECON:
         download_and_store_series_all_releases(series_name)
 
 
