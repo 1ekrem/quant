@@ -21,37 +21,46 @@ _api = fredapi.Fred(api_key=FREDKEY)
 
 # data config
 US_ECON = [# Economic indicator
-           'CPIAUCSL', 'T10YIE', 'T5YIFR', 'PAYEMS', 'USSLIND',
+           'PAYEMS', 'USSLIND', 'FRBLMCI',
+           # Inflation
+           'T10YIE', 'T5YIFR', 'MICH', 'CPILFESL',
+           # Consumption
+           'UMCSENT', 'PCEC96', 'TOTALSA', 'RSXFS',
            # National income
            'GDP', 'GDPC1',
            # Interest rates
-           'WGS10YR', 'WGS5YR', 'WGS2YR', 'WGS1YR', 'MORTGAGE30US', 'FF', 'DTB3', 'FEDFUNDS', 'T10Y2Y',
-           'USD3MTD156N', 'USD1MTD156N', 'BAMLH0A0HYM2EY', 'TEDRATE',
+           'WGS10YR', 'WGS5YR', 'WGS2YR', 'WGS1YR', 'MORTGAGE30US', 'FF', 'DTB3', 'FEDFUNDS', 'DFEDTARU',
+           'T10Y2Y', 'BAMLH0A0HYM2EY', 'TEDRATE',
            # Current population survey
-           'UNRATE',
+           'UNRATE', 'IC4WSA',
            # Housing
-           'HOUST', 'HOUST1F', 'CSUSHPINSA',
-           # Industrial production
-           'INDPRO',
+           'HOUST', 'HOUST1F', 'CSUSHPINSA', 'MSPNHSUS', 'HSN1F',
+           # Industrial and manufacturing
+           'INDPRO', 'DGORDER', 'NEWORDER',
            # Transportation
            'RAILFRTINTERMODAL',
            # Corporate bond yield
-           'WAAA', 'WBAA',
+           'WAAA', 'WBAA', 'BAMLC0A4CBBBEY',
            # Risk indicator
-           'DRSFRMACBS', 'BAMLH0A0HYM2',
+           'DRSFRMACBS', 'BAMLH0A0HYM2', 'BAMLC0A4CBBB', 'BAMLH0A3HYC', 'DRCCLACBS',
            ]
 EU_ECON = [# Interest rates
            'IRLTLT01DEM156N',
            ]
 CHINA_ECON = [# Economic indicator
-              'CHNCPIALLMINMEI'
+              'CHNCPIALLMINMEI',
+              # Monetary policy
+              'MYAGM2CNM189N',
               ]
 US_SERIES = [# Stock
-             'SP500', 'NASDAQCOM',
+             'SP500', 'NASDAQCOM', 'DJIA', 'VIXCLS',
              # FX
              'DEXUSEU', 'DEXUSUK', 'DEXUSNZ', 'DEXUSAL', 'DEXJPUS',
              # Commodities
-             'DCOILWTICO']
+             'DCOILWTICO', 'DCOILBRENTEU', 'GOLDAMGBD228NLBM',
+             # Interest rates
+             'USD3MTD156N', 'USD12MD156N', 'USDONTD156N',
+             ]
 
 # utils
 def create_tables():
