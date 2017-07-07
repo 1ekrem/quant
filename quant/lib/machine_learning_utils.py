@@ -34,14 +34,14 @@ def give_me_pandas_variables(x, y):
     return myx.fillna(0.), myy.fillna(0.)
 
 
-def pandas_ewma(data, span=2):
-    return data.ewm(span=span if span >=1. else 1., ignore_na=True).mean()
+def pandas_ewma(data, span=None):
+    return data.ewm(span=span, ignore_na=True).mean() if span > 1. else data
 
 
-def pandas_weeks_ewma(data, span=2):
+def pandas_weeks_ewma(data, span=None):
     df = data.index.to_series().diff().dropna().mean()
-    es = 7. * span / df.days
-    return data.ewm(span=es if es >= 1. else 1., ignore_na=True).mean() 
+    es = 7. * span / df.days if span is not None else None
+    return data.ewm(span=es, ignore_na=True).mean() if es > 1. else data 
 
 
 # Boosting

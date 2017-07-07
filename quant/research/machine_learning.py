@@ -3,203 +3,28 @@ Created on 22 Jun 2017
 
 @author: wayne
 '''
-import os
 import numpy as np
 import pandas as pd
 from datetime import datetime as dt
 from matplotlib import pyplot as plt
-from quant.lib import timeseries_utils as tu, data_utils as du, portfolio_utils as pu, \
+from quant.data import bloomberg
+from quant.lib import timeseries_utils as tu, portfolio_utils as pu, \
     machine_learning_utils as mu, visualization_utils as vu
 from quant.lib.main_utils import logger
 
 
-DATABASE_NAME = 'quant'
-INDEX_TABLE_NAME = 'bloomberg_index_prices'
-US_ECON_TABLE_NAME = 'bloomberg_us_econ'
-ACTUAL_RELEASE = 'ACTUAL_RELEASE'
-PX_LAST = 'PX_LAST'
-DATA_MISSING_FAIL = 0.7
-
-
-# price loader
-def load_bloomberg_index_prices(tickers, start_date=None, end_date=None):
-    return tu.get_timeseries(DATABASE_NAME, INDEX_TABLE_NAME, index_range=(start_date, end_date), column_list=tickers)
-
-
-# Bloomberg economic data
-def load_bloomberg_econ_release(ticker, start_date=None, end_date=None, table_name=US_ECON_TABLE_NAME):
-    data = tu.get_timeseries(DATABASE_NAME, table_name, index_range=(start_date, end_date), column_list=[ticker + '|' + ACTUAL_RELEASE])
-    if data is not None:
-        data = data.iloc[:, 0]
-        data.name = ticker
-    return data
-
-
-def load_bloomberg_econ_last(ticker, start_date=None, end_date=None, table_name=US_ECON_TABLE_NAME):
-    data = tu.get_timeseries(DATABASE_NAME, table_name, index_range=(start_date, end_date), column_list=[ticker + '|' + PX_LAST])
-    if data is not None:
-        data = data.iloc[:, 0]
-        data.name = ticker
-    return data
-
-
-def load_bloomberg_econ_change(ticker, start_date=None, end_date=None, table_name=US_ECON_TABLE_NAME):
-    release = load_bloomberg_econ_release(ticker, start_date, end_date, table_name)
-    last = load_bloomberg_econ_last(ticker, start_date, end_date, table_name)
-    if release is not None and last is not None:
-        return release - last.shift()
-    else:
-        return None
-
-
-def load_bloomberg_econ_revision(ticker, start_date=None, end_date=None, table_name=US_ECON_TABLE_NAME):
-    release = load_bloomberg_econ_release(ticker, start_date, end_date, table_name)
-    last = load_bloomberg_econ_last(ticker, start_date, end_date, table_name)
-    if release is not None and last is not None:
-        return (last - release).shift()
-    else:
-        return None
-
-
-def get_bloomberg_econ_list(table_name=US_ECON_TABLE_NAME):
-    vals = du.get_table_column_values(DATABASE_NAME, table_name)
-    return vals if vals is None else list(set([x.split('|')[0] for x in vals]))
-
-
-def bloomberg_release_loader(tickers, start_date=None, end_date=None):
-    return dict([(ticker, load_bloomberg_econ_release(ticker, start_date, end_date)) for ticker in tickers])
-
-
-def bloomberg_change_loader(tickers, start_date=None, end_date=None):
-    return dict([(ticker, load_bloomberg_econ_change(ticker, start_date, end_date)) for ticker in tickers])
-
-
-def bloomberg_revision_loader(tickers, start_date=None, end_date=None):
-    return dict([(ticker, load_bloomberg_econ_revision(ticker, start_date, end_date)) for ticker in tickers])
+DATA_MISSING_FAIL = 0.5
 
 
 # Simulations
-def univariate_run_one(input, input_type='release'):
-    if input_type == 'release':
-        input_data_loader = bloomberg_release_loader
-    elif input_type == 'change':
-        input_data_loader = bloomberg_change_loader
-    elif input_type == 'revision':
-        input_data_loader = bloomberg_revision_loader
-    simulation_name = '%s %s' % (input, input_type)
-    sim = pu.Sim(assets=['SPX Index'], asset_data_loader=load_bloomberg_index_prices,
-                 start_date=dt(2002, 1, 1), end_date=dt(2017, 6, 1), data_frequency='M',
-                 sample_window=24, model_frequency='Q', inputs = [input],
-                 input_data_loader=input_data_loader, strategy_component=mu.BoostingStumpComponent,
-                 position_component=pu.SimpleLongOnly, simulation_name=simulation_name)
-    a = sim.analytics['SPX Index'].iloc[1, :]
-    sharpes = sim.analytics['SPX Index']['sharpe']
-    a.loc['sharpe improvement'] = sharpes.values[1] - sharpes.values[0]
-    a.loc['input type'] = input_type
-    a.loc['input'] = input
-    return a
-
-
-def run_univariate_econ_boosting():
-    analytics = []
-    econ = get_bloomberg_econ_list()
-    for input_type in ['release', 'change', 'revision']:
-        for use_scores in [False, True]:
-            for input in econ:
-                analytics.append(univariate_run_one(input, input_type, use_scores))
-    analytics = pd.concat(analytics, axis=1).T
-    analytics.to_csv(os.path.expanduser('~/TempWork/quant/univariate_boosting.csv'))
-    return analytics
-
-
-def multivariate_run_one(model, input_type='release', cross_validation=False):
-    econ = get_bloomberg_econ_list()
-    if input_type == 'release':
-        input_data_loader = bloomberg_release_loader
-    elif input_type == 'change':
-        input_data_loader = bloomberg_change_loader
-    elif input_type == 'revision':
-        input_data_loader = bloomberg_revision_loader
-    if model == 'Boosting':
-        strategy_component = mu.BoostingStumpComponent
-    elif model == 'RandomBoosting':
-        strategy_component = mu.RandomBoostingComponent
-    simulation_name = '%s %s%s' % (model, input_type, ' CV' if cross_validation else '')
-    if cross_validation:
-        params = dict(cross_validation=True, cross_validation_data_func=mu.pandas_ewma,
-                      cross_validation_params=[{'span': x} for x in np.arange(2, 7)])
-    else:
-        params = {}
-    sim = pu.Sim(assets=['SPX Index'], asset_data_loader=load_bloomberg_index_prices,
-                 start_date=dt(2005,1, 1), end_date=dt(2017, 6, 1), data_frequency='M',
-                 sample_window=60, model_frequency='Q', inputs=econ,
-                 input_data_loader=input_data_loader, strategy_component=strategy_component,
-                 position_component=pu.SimpleLongOnly, simulation_name=simulation_name, **params)
-    a = sim.analytics['SPX Index'].iloc[1, :]
-    acc = sim.strategy_returns.iloc[:, 0].cumsum()
-    acc.name = '%s (mean: %.2f, std: %.2f, sharpe: %.2f)' % (simulation_name, a.loc['mean'], a.loc['std'], a.loc['sharpe'])
-    a0 = sim.analytics['SPX Index'].iloc[0, :]
-    acc0 = sim.asset_returns.iloc[:, 0].cumsum()
-    acc0.name = 'SPX Index (mean: %.2f, std: %.2f, sharpe: %.2f)' % (a0.loc['mean'], a0.loc['std'], a0.loc['sharpe'])
-    return acc, acc0
-
-
-def run_multivariate_econ_boosting():
-    accs = []
-    for model in ['RandomBoosting']:
-        for input_type in ['release', 'change', 'revision']:
-            for cv in [True, False]:
-                acc, acc0 = multivariate_run_one(model, input_type, cv)
-                if len(accs) == 0:
-                    accs.append(acc0)
-                accs.append(acc)
-    return pd.concat(accs, axis=1)
-
-
-def run_signal_spline_study():
-    econ = get_bloomberg_econ_list()
-    input_data_loader = bloomberg_release_loader
-    strategy_component = mu.RandomBoostingComponent
-    simulation_name = 'boosting release'
-    sim = pu.Sim(assets=['SPX Index'], asset_data_loader=load_bloomberg_index_prices,
-                 start_date=dt(2005, 1, 1), end_date=dt(2017, 6, 1), data_frequency='M',
-                 sample_window=60, model_frequency='Q', inputs=econ,
-                 input_data_loader=input_data_loader, strategy_component=strategy_component,
-                 position_component=pu.SimpleLongOnly, simulation_name=simulation_name)
-    x = sim.signal.iloc[:, 0].shift()
-    x.name = 'Signal'
-    y = sim._asset_returns.iloc[:, 0]
-    plt.figure()
-    vu.bin_plot(x, y)
-    x2 = sim.normalized_signal.iloc[:, 0].shift()
-    x.name = 'Normalized Signal'
-    plt.figure()
-    vu.bin_plot(x2, y)
-
-
-def cross_validation_test_case():
-    econ = get_bloomberg_econ_list()
-    input_data_loader = bloomberg_release_loader
-    strategy_component = mu.BoostingStumpComponent
-    simulation_name = 'boosting release'
-    sim = pu.Sim(assets=['SPX Index'], asset_data_loader=load_bloomberg_index_prices,
-                 start_date=dt(2005, 1, 1), end_date=dt(2017, 6, 1), data_frequency='M',
-                 sample_window=60, model_frequency='Q', inputs=econ,
-                 input_data_loader=input_data_loader, strategy_component=strategy_component,
-                 position_component=pu.SimpleLongOnly, simulation_name=simulation_name,
-                 cross_validation=True, cross_validation_data_func=mu.pandas_ewma,
-                 cross_validation_params=[{'span': x} for x in np.arange(2, 10)])
-    return sim
-
-
 class EconSim(object):
     '''
     Pension Simulation
     '''
     def __init__(self, start_date, end_date, sample_date, data_frequency, assets, asset_data_loader,
                  inputs, input_data_loader, strategy_component, position_component, simulation_name,
-                 data_transform_func=None, data_missing_fail=0.5, cross_validation=False,
-                 cross_validation_params=None, cross_validation_buckets=5):
+                 data_transform_func=None, data_missing_fail=DATA_MISSING_FAIL, simple_returns=False,
+                 cross_validation=False, cross_validation_params=None, cross_validation_buckets=5):
         self.simulation_name = simulation_name
         self.assets = assets
         self.asset_data_loader = asset_data_loader
@@ -213,6 +38,7 @@ class EconSim(object):
         self.data_frequency = data_frequency
         self.strategy_component = strategy_component
         self.position_component = position_component
+        self.simple_returns = simple_returns
         self.cross_validation = cross_validation
         self.cross_validation_params = cross_validation_params
         self.cross_validation_buckets = cross_validation_buckets
@@ -236,7 +62,11 @@ class EconSim(object):
     def load_asset_prices(self):
         logger.info('Loading asset prices')
         self.asset_prices = self.asset_data_loader(self.assets, start_date=self._load_start, end_date=self._load_end)
-        self._asset_returns = tu.resample(self.asset_prices, self.timeline).diff()
+        p = tu.resample(self.asset_prices, self.timeline)
+        if self.simple_returns:
+            self._asset_returns = p.diff()
+        else:
+            self._asset_returns = p.diff() / p.shift()
 
     def load_input_data(self):
         logger.info('Loading input data')
@@ -315,30 +145,37 @@ class EconSim(object):
 
     def calculate_returns(self):
         logger.info('Simulating strategy returns')
-        self.asset_returns = self.asset_prices.resample('B').last().ffill().diff()
+        p = self.asset_prices.resample('B').last().ffill()
+        self.asset_returns = p.diff() if self.simple_returns else p.diff() / p.shift()
         self.positions = self.position_component(**{'signal': self.signal, 'normalized_signal': self.normalized_signal})
         start_date = self.start_date if self.start_date > self.positions.first_valid_index() else self.positions.first_valid_index()
         self.strategy_returns = tu.resample(self.positions, self.asset_returns).shift() * self.asset_returns
         self.strategy_returns = self.strategy_returns[start_date:]
+        self.oos_strategy_returns = self.strategy_returns[self.sample_date:]
         self.asset_returns = self.asset_returns[start_date:]
+        self.oos_asset_returns = self.asset_returns[self.sample_date:]
 
     def get_analytics(self):
         logger.info('Calculating analytics')
         self.analytics = {}
+        self.oos_analytics = {}
         for asset in self.assets:
             rtn = pd.concat([self.asset_returns[asset], self.strategy_returns[asset]], axis=1)
             rtn.columns = [asset, self.simulation_name]
             self.analytics[asset] = pu.get_returns_analytics(rtn)
+            self.oos_analytics[asset] = pu.get_returns_analytics(rtn[self.sample_date:])
 
 
-def econ_run_one(model, input_type='release', cross_validation=False):
-    econ = get_bloomberg_econ_list()
+def get_bloomberg_sim(model, input_type='release', cross_validation=False):
+    econ = bloomberg.get_bloomberg_econ_list()
     if input_type == 'release':
-        input_data_loader = bloomberg_release_loader
+        input_data_loader = bloomberg.bloomberg_release_loader
     elif input_type == 'change':
-        input_data_loader = bloomberg_change_loader
+        input_data_loader = bloomberg.bloomberg_change_loader
+    elif input_type == 'annual change':
+        input_data_loader = bloomberg.bloomberg_annual_change_loader
     elif input_type == 'revision':
-        input_data_loader = bloomberg_revision_loader
+        input_data_loader = bloomberg.bloomberg_revision_loader
     if model == 'Boosting':
         strategy_component = mu.BoostingStumpComponent
     elif model == 'RandomBoosting':
@@ -346,36 +183,54 @@ def econ_run_one(model, input_type='release', cross_validation=False):
     simulation_name = '%s %s%s' % (model, input_type, ' CV' if cross_validation else '')
     if cross_validation:
         params = dict(cross_validation=True,
-                      cross_validation_params=[{}] + [{'no_of_variables': x} for x in np.arange(10, 20)],
+                      cross_validation_params=[{}] + [{'span': x} for x in np.arange(2, 14)],
                       cross_validation_buckets=5)
     else:
         params = {}
-    sim = EconSim(assets=['SPX Index'], asset_data_loader=load_bloomberg_index_prices,
-                 start_date=dt(2000,1, 1), end_date=dt(2017, 6, 1), sample_date=dt(2010, 1,1), data_frequency='M',
+    sim = EconSim(assets=['SPX Index'], asset_data_loader=bloomberg.load_bloomberg_index_prices,
+                 start_date=dt(2000, 1, 1), end_date=dt(2017, 6, 1), sample_date=dt(2010, 1,1), data_frequency='M',
                  inputs=econ, input_data_loader=input_data_loader, strategy_component=strategy_component,
-                 position_component=pu.SimpleLongOnly, simulation_name=simulation_name,
-                 data_transform_func=None, **params)
-    a = sim.analytics['SPX Index'].iloc[1, :]
-    acc = sim.strategy_returns.iloc[:, 0].cumsum()
-    acc.name = '%s (mean: %.2f, std: %.2f, sharpe: %.2f)' % (simulation_name, a.loc['mean'], a.loc['std'], a.loc['sharpe'])
-    a0 = sim.analytics['SPX Index'].iloc[0, :]
-    acc0 = sim.asset_returns.iloc[:, 0].cumsum()
-    acc0.name = 'SPX Index (mean: %.2f, std: %.2f, sharpe: %.2f)' % (a0.loc['mean'], a0.loc['std'], a0.loc['sharpe'])
+                 simple_returns=False, position_component=pu.SimpleLongOnly, simulation_name=simulation_name,
+                 data_transform_func=mu.pandas_weeks_ewma, **params)
+    return sim
+
+
+def econ_run_one(model, input_type='release', cross_validation=False, oos=False, data_source='bloomberg'):
+    if data_source == 'bloomberg':
+        sim = get_bloomberg_sim(model, input_type, cross_validation)
+    analytics = sim.oos_analytics if oos else sim.analytics
+    strategy_returns = sim.oos_strategy_returns if oos else sim.strategy_returns
+    asset_returns = sim.oos_asset_returns if oos else sim.asset_returns
+    a = analytics['SPX Index'].iloc[1, :]
+    acc = (1. + strategy_returns.iloc[:, 0]).cumprod() - 1.
+    acc.name = '%s (mean: %.1f%%, std: %.1f%%, sharpe: %.2f)' % (sim.simulation_name, 100. * a.loc['mean'], 100. * a.loc['std'], a.loc['sharpe'])
+    a0 = analytics['SPX Index'].iloc[0, :]
+    acc0 = (1. + asset_returns.iloc[:, 0]).cumprod() - 1.
+    acc0.name = 'SPX Index (mean: %.1f%%, std: %.1f%%, sharpe: %.2f)' % (100. * a0.loc['mean'], 100. * a0.loc['std'], a0.loc['sharpe'])
     return acc, acc0
 
 
-def run_econ_boosting():
+def run_econ_boosting(oos=False):
     accs = []
     for model in ['Boosting']:
-        for input_type in ['release', 'change', 'revision']:
-            for cv in [True, False]:
-                acc, acc0 = econ_run_one(model, input_type, cv)
+        for input_type in ['release', 'change', 'annual change', 'revision']:
+            for cv in [False]:
+                acc, acc0 = econ_run_one(model, input_type, cv, oos)
                 if len(accs) == 0:
                     accs.append(acc0)
                 accs.append(acc)
     return pd.concat(accs, axis=1)
 
 
-if __name__ == '__main__':
-    _ = run_univariate_econ_boosting()
+def run_signal_spline_study(model='Boosting'):
+    sim = get_bloomberg_sim(model, 'release', False)
+    x = sim.signal.iloc[:, 0].shift()
+    x.name = 'Signal'
+    y = sim._asset_returns.iloc[:, 0]
+    plt.figure()
+    vu.bin_plot(x, y)
+    x2 = sim.normalized_signal.iloc[:, 0].shift()
+    x.name = 'Normalized Signal'
+    plt.figure()
+    vu.bin_plot(x2, y)
 
