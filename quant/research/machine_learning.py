@@ -23,14 +23,16 @@ class EconSim(object):
     '''
     def __init__(self, start_date, end_date, sample_date, data_frequency, assets, asset_data_loader,
                  inputs, input_data_loader, strategy_component, position_component, simulation_name,
-                 data_transform_func=None, data_missing_fail=DATA_MISSING_FAIL, simple_returns=False,
-                 cross_validation=False, cross_validation_params=None, cross_validation_buckets=5):
+                 data_transform_func=None, default_params=None, data_missing_fail=DATA_MISSING_FAIL,
+                 simple_returns=False, cross_validation=False, cross_validation_params=None,
+                 cross_validation_buckets=5):
         self.simulation_name = simulation_name
         self.assets = assets
         self.asset_data_loader = asset_data_loader
         self.inputs = inputs
         self.input_data_loader = input_data_loader
         self.data_transform_func = data_transform_func
+        self.default_params = {} if default_params is None else default_params
         self.data_missing_fail = data_missing_fail
         self.start_date = start_date
         self.end_date = end_date
@@ -98,7 +100,7 @@ class EconSim(object):
                                            out_of_sample_data=out_of_sample_data, params=params)
 
     def run_without_cross_validation(self, in_sample, out_of_sample):
-        return self.estimate_model(in_sample, out_of_sample)
+        return self.estimate_model(in_sample, out_of_sample, self.default_params)
 
     def run_cross_validation(self, in_sample, out_of_sample):
         seq = pu.get_cross_validation_buckets(len(in_sample), self.cross_validation_buckets)
@@ -106,19 +108,21 @@ class EconSim(object):
         error_rate = 100.
         for param in self.cross_validation_params:
             errors = []
+            validation_param = self.default_params.copy()
+            validation_param.update(param)
             for j in xrange(self.cross_validation_buckets):
                 bucket = seq[j]
                 validation = in_sample.iloc[bucket]
                 estimation = in_sample.loc[~in_sample.index.isin(validation.index)]
                 validation_returns = self._asset_returns.loc[validation.index]
-                model = self.estimate_model(estimation, validation, param)
+                model = self.estimate_model(estimation, validation, validation_param)
                 if model is not None:
                     iteration_error = mu.StumpError(model.signal.iloc[:, 0], validation_returns.iloc[:, 0], 0.)
                     errors.append(iteration_error)
             errors = np.mean(errors)
             if errors < error_rate:
                 error_rate = errors
-                selection = param
+                selection = validation_param
         if selection is None:
             return None, None, None
         else:
@@ -169,7 +173,7 @@ class EconSim(object):
 def get_bloomberg_sim(model, input_type='release', cross_validation=False):
     econ = bloomberg.get_bloomberg_econ_list()
     if input_type == 'release':
-        input_data_loader = bloomberg.bloomberg_release_loader
+        input_data_loader = bloomberg.bloomberg_extended_release_loader
     elif input_type == 'change':
         input_data_loader = bloomberg.bloomberg_change_loader
     elif input_type == 'annual change':
@@ -183,7 +187,7 @@ def get_bloomberg_sim(model, input_type='release', cross_validation=False):
     simulation_name = '%s %s%s' % (model, input_type, ' CV' if cross_validation else '')
     if cross_validation:
         params = dict(cross_validation=True,
-                      cross_validation_params=[{}] + [{'span': x} for x in np.arange(2, 14)],
+                      cross_validation_params=[{}] + [{'span': x} for x in np.arange(1, 27)],
                       cross_validation_buckets=5)
     else:
         params = {}
@@ -191,7 +195,7 @@ def get_bloomberg_sim(model, input_type='release', cross_validation=False):
                  start_date=dt(2000, 1, 1), end_date=dt(2017, 6, 1), sample_date=dt(2010, 1,1), data_frequency='M',
                  inputs=econ, input_data_loader=input_data_loader, strategy_component=strategy_component,
                  simple_returns=False, position_component=pu.SimpleLongOnly, simulation_name=simulation_name,
-                 data_transform_func=mu.pandas_weeks_ewma, **params)
+                 data_transform_func=None, **params)
     return sim
 
 
@@ -210,15 +214,13 @@ def econ_run_one(model, input_type='release', cross_validation=False, oos=False,
     return acc, acc0
 
 
-def run_econ_boosting(oos=False):
+def run_econ_boosting(model='Boosting', oos=False, cv=False):
     accs = []
-    for model in ['Boosting']:
-        for input_type in ['release', 'change', 'annual change', 'revision']:
-            for cv in [False]:
-                acc, acc0 = econ_run_one(model, input_type, cv, oos)
-                if len(accs) == 0:
-                    accs.append(acc0)
-                accs.append(acc)
+    for input_type in ['release', 'change', 'annual change', 'revision']:
+        acc, acc0 = econ_run_one(model, input_type, cv, oos)
+        if len(accs) == 0:
+            accs.append(acc0)
+        accs.append(acc)
     return pd.concat(accs, axis=1)
 
 

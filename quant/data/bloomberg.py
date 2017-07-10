@@ -86,6 +86,20 @@ def load_bloomberg_econ_release(ticker, start_date=None, end_date=None, table_na
     return data
 
 
+def load_bloomberg_extended_econ_release(ticker, start_date=None, end_date=None, table_name=US_ECON_TABLE_NAME):
+    data = tu.get_timeseries(DATABASE_NAME, table_name, index_range=(start_date, end_date), column_list=[ticker + '|' + ACTUAL_RELEASE])
+    if data is not None:
+        data = data.iloc[:, 0]
+        data.name = ticker
+    data2 = tu.get_timeseries(DATABASE_NAME, table_name, index_range=(start_date, end_date), column_list=[ticker + '|' + PX_LAST])
+    if data2 is not None:
+        data2 = data2.iloc[:, 0]
+        data2.name = ticker
+        idx = data.first_valid_index()
+        data = pd.concat([data2.loc[data2.index < idx], data], axis=0)
+    return data
+
+
 def load_bloomberg_econ_last(ticker, start_date=None, end_date=None, table_name=US_ECON_TABLE_NAME):
     data = tu.get_timeseries(DATABASE_NAME, table_name, index_range=(start_date, end_date), column_list=[ticker + '|' + PX_LAST])
     if data is not None:
@@ -95,7 +109,7 @@ def load_bloomberg_econ_last(ticker, start_date=None, end_date=None, table_name=
 
 
 def load_bloomberg_econ_change(ticker, start_date=None, end_date=None, table_name=US_ECON_TABLE_NAME):
-    release = load_bloomberg_econ_release(ticker, start_date, end_date, table_name)
+    release = load_bloomberg_extended_econ_release(ticker, start_date, end_date, table_name)
     last = load_bloomberg_econ_last(ticker, start_date, end_date, table_name)
     if release is not None and last is not None:
         return release - last.shift()
@@ -128,6 +142,10 @@ def get_bloomberg_econ_list(table_name=US_ECON_TABLE_NAME):
 
 def bloomberg_release_loader(tickers, start_date=None, end_date=None):
     return dict([(ticker, load_bloomberg_econ_release(ticker, start_date, end_date)) for ticker in tickers])
+
+
+def bloomberg_extended_release_loader(tickers, start_date=None, end_date=None):
+    return dict([(ticker, load_bloomberg_extended_econ_release(ticker, start_date, end_date)) for ticker in tickers])
 
 
 def bloomberg_change_loader(tickers, start_date=None, end_date=None):

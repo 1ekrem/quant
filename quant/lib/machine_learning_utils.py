@@ -96,7 +96,7 @@ def get_weight_from_error(e):
     return .5 * np.log((1. - e + MINIMUM_ERROR) / (e + MINIMUM_ERROR))
 
     
-def estimate_boosting_stump(x, y, estimate_intercept=False):
+def estimate_boosting_stump(x, y, estimate_intercept=True):
     '''
     Estimating boosting stump for one target variable
     '''
@@ -124,7 +124,7 @@ def estimate_boosting_stump(x, y, estimate_intercept=False):
     return pd.DataFrame(ans, columns=['predicative', 'target', 'estimation', 'Error', 'weight'])
 
 
-def BoostingStump(x, y, estimate_intercept=False, no_of_variables=None, *args, **kwargs):
+def BoostingStump(x, y, estimate_intercept=True, no_of_variables=None, *args, **kwargs):
     '''
     Boosting stump with Pandas variables
     
@@ -174,7 +174,7 @@ def get_random_sequence(n_variables, forest_size, seed=0):
     return ans
 
 
-def RandomBoosting(x, y, forest_size=100, estimate_intercept=False, no_of_variables=None, *args, **kwargs):
+def RandomBoosting(x, y, forest_size=100, estimate_intercept=True, no_of_variables=None, *args, **kwargs):
     '''
     Random forest on top of boosting
     Returns a list of tuples of (randomization, boosting model)
@@ -229,7 +229,6 @@ def BoostingPrediction(x, ans):
             if predicative == BOOSTING_INTERCEPT:
                 tmp = x.iloc[:, 0].copy() * np.nan
                 tmp = tmp.fillna(1.)
-                
             else:
                 tmp = StumpPrediction(x[predicative], estimation)
             predictions[target].append(tmp * weight)
