@@ -7,7 +7,8 @@ import sys
 import fredapi
 import numpy as np
 import pandas as pd
-from quant.lib import data_utils as du
+from datetime import datetime as dt, timedelta
+from quant.lib import data_utils as du, timeseries_utils as tu
 from quant.lib.main_utils import logger
 
 DATABASE_NAME = 'quant'
@@ -23,14 +24,14 @@ _api = fredapi.Fred(api_key=FREDKEY)
 US_ECON = [# Economic indicator
            'PAYEMS', 'USSLIND', 'FRBLMCI',
            # Inflation
-           'T10YIE', 'T5YIFR', 'MICH', 'CPILFESL',
+           'T10YIE', 'T5YIFR', 'MICH', 'CPILFESL', 'PPIACO',
            # Consumption
            'UMCSENT', 'PCEC96', 'TOTALSA', 'RSXFS',
            # National income
            'GDP', 'GDPC1',
            # Interest rates
            'WGS10YR', 'WGS5YR', 'WGS2YR', 'WGS1YR', 'MORTGAGE30US', 'FF', 'DTB3', 'FEDFUNDS', 'DFEDTARU',
-           'T10Y2Y', 'BAMLH0A0HYM2EY', 'TEDRATE',
+           'T10Y2Y', 'T10Y3M', 'BAMLH0A0HYM2EY', 'TEDRATE',
            # Current population survey
            'UNRATE', 'IC4WSA',
            # Housing
@@ -42,15 +43,32 @@ US_ECON = [# Economic indicator
            # Corporate bond yield
            'WAAA', 'WBAA', 'BAMLC0A4CBBBEY',
            # Risk indicator
-           'DRSFRMACBS', 'BAMLH0A0HYM2', 'BAMLC0A4CBBB', 'BAMLH0A3HYC', 'DRCCLACBS',
+           'DRSFRMACBS', 'BAMLH0A0HYM2', 'BAMLC0A4CBBB', 'BAMLH0A3HYC', 'DRCCLACBS', 'USREC', 'USARECM',
            ]
 EU_ECON = [# Interest rates
-           'IRLTLT01DEM156N',
+           'IRLTLT01DEM156N', 'BAMLHE00EHYIEY', 'BAMLHE00EHYIOAS', 'EUR3MTD156N',
+           'BAMLEMRECRPIEMEAOAS', 'EUR12MD156N', 'BAMLEMRECRPIEMEAEY', 'INTGSBEZM193N',
+           # Economic indicator
+           'EUEPUINDXM', 'EUNNGDP', 'SLRTTO01OEQ659S', 'CLVMEURSCAB1GQEA19',
+           'SLRTCR03OEQ661S', 'CRDQXMAPABIS',
+           # Inflation
+           'CP0000EZ19M086NEST', 'CPALTT01OEM661N',
+           # Risk indicators
+           'BAMLHE00EHYITRIV', 'EUROREC', 'EUEPUINDXM',
            ]
 CHINA_ECON = [# Economic indicator
-              'CHNCPIALLMINMEI',
+              'CHNCPIALLMINMEI', 'MKTGDPCNA646NWDB', 'CHNGDPNQDSMEI', 'CRDQCNAPABIS',
+              'XTEXVA01CNM667S', 'XTIMVA01CNM667S', 'SLRTTO02CNQ189N', 'PRENEL01CNQ656N',
               # Monetary policy
-              'MYAGM2CNM189N',
+              'MYAGM2CNM189N', 'MANMM101CNM189S', 'MABMM301CNM189S',
+              # Inflation
+              'CHNCPIALLMINMEI', 'FPCPITOTLZGCHN',
+              # Real estate
+              'QCNR368BIS',
+              # Interest rate
+              'INTDSRCNM193N',
+              # Risk indicators
+              'VXFXICLS', 'CHIEPUINDXM', 'CHNRECM',
               ]
 US_SERIES = [# Stock
              'SP500', 'NASDAQCOM', 'DJIA', 'VIXCLS',
@@ -140,7 +158,7 @@ def get_release_bulk_insert_script(data, table_name, series_name):
 
 def get_release_bulk_delete_script(data, table_name, series_name):
     delete_value_script = _release_to_delete_sql(data, series_name)
-    delete_format_script = "('time_index', 'realtime_start', 'series_name')"
+    delete_format_script = "(time_index, realtime_start, series_name)"
     if len(delete_value_script) > 0:
         delete_script = du.BULK_TABLE_DELETE % (table_name, delete_format_script, delete_value_script)
     else:
@@ -215,6 +233,96 @@ def download_all_releases():
 def download_all_series():
     for series_name in US_SERIES:
         download_and_store_series(series_name)
+
+
+# data loader
+def get_fred_us_econ_list():
+    return US_ECON
+
+
+def get_fred_global_econ_list():
+    return US_ECON + CHINA_ECON + EU_ECON
+
+
+def get_fred_first_release(series_name, start_date=None, end_date=None):
+    data = get_series_all_release(series_name, start_date, end_date)
+    if data is not None:
+        ans = data.groupby('realtime_start').agg(lambda x:x.sort_values('time_index').iloc[-1]).sort_index()['value']
+        ans.name = series_name
+        return None if ans.empty else tu.remove_outliers(ans)
+    else:
+        return None
+
+
+def get_fred_change(series_name, time_delta, start_date=None, end_date=None):
+    data = get_series_all_release(series_name, start_date, end_date)
+    if data is not None:
+        data = data.sort_values(['time_index', 'realtime_start'])
+        release = data.groupby('realtime_start').agg(lambda x:x.sort_values('time_index').iloc[-1]).reset_index()
+        history = pd.Series()
+        for idx in release.time_index:
+            subset = data[data.time_index == idx]
+            effective_date = subset.realtime_start.min() + timedelta(time_delta)
+            subset2 = subset[subset.realtime_start >= effective_date]
+            history.loc[effective_date] = subset.value.iloc[-1] if subset2.empty else subset2.value.iloc[0]
+        release.index = release.realtime_start
+        history = tu.resample(history, release)
+        ans = release.value - history
+        ans.name = series_name
+        return None if ans.empty else tu.remove_outliers(ans)
+    else:
+        return None
+        
+
+def get_fred_revision(series_name, start_date=None, end_date=None):
+    data = get_series_all_release(series_name, start_date, end_date)
+    if data is not None:
+        data = data.sort_values(['time_index', 'realtime_start'])
+        data['diff'] = data.value.diff()
+        data.loc[data.time_index != data.time_index.shift(), 'diff'] = np.nan
+        data = data.dropna()
+        data = data.groupby('realtime_start').agg(lambda x:x.sort_values('time_index').iloc[-1]).reset_index()
+        data = data.groupby('time_index').first().reset_index()
+        ans = data['diff']
+        ans.name = series_name
+        ans.index = data.realtime_start
+        return None if ans.empty else tu.remove_outliers(ans)
+    else:
+        return None
+
+
+def get_fred_combined(series_name, start_date=None, end_date=None):
+    ans = []
+    release = get_fred_first_release(series_name, start_date, end_date)
+    if release is not None:
+        release.name = series_name + '|release'
+        ans.append(release)
+    change = get_fred_change(series_name, 365, start_date, end_date)
+    if change is not None:
+        change.name = series_name + '|annualchange'
+        ans.append(change)
+    revision = get_fred_revision(series_name, start_date, end_date)
+    if revision is not None:
+        revision.name = series_name + '|revision'
+        ans.append(revision)
+    return None if len(ans) == 0 else pd.concat(ans, axis=1)
+
+
+def fred_release_loader(tickers, start_date=None, end_date=None):
+    return dict([(ticker, get_fred_first_release(ticker, start_date, end_date)) for ticker in tickers])
+
+
+def fred_annual_change_loader(tickers, start_date=None, end_date=None, time_delta=365):
+    return dict([(ticker, get_fred_change(ticker, time_delta, start_date, end_date)) for ticker in tickers])
+
+
+def fred_revision_loader(tickers, start_date=None, end_date=None):
+    return dict([(ticker, get_fred_revision(ticker, start_date, end_date)) for ticker in tickers])
+
+
+def fred_combined_loader(tickers, start_date=None, end_date=None):
+    return dict([(ticker, get_fred_combined(ticker, start_date, end_date)) for ticker in tickers])
+
 
 
 def main():

@@ -9,7 +9,7 @@ import pandas as pd
 from datetime import datetime as dt, timedelta
 from quant.lib import timeseries_utils as tu
 from quant.lib.main_utils import logger
-from quant.lib.machine_learning_utils import get_random_sequence, StumpError
+from quant.lib.machine_learning_utils import get_cross_validation_buckets, StumpError
 
 
 def get_timeline(start_date, end_date, frequency, sample_window=None):
@@ -56,17 +56,6 @@ def ignore_insufficient_series(data, min_size):
     assert isinstance(data, pd.DataFrame)
     ans = data.loc[:, (-data.isnull()).sum(axis=0) >= min_size]
     return None if ans.empty else ans
-
-
-def get_cross_validation_buckets(data_size, buckets):
-    seq = get_random_sequence(data_size, 1)[0]
-    step_size = 1. * data_size / buckets
-    ans = []
-    for i in xrange(buckets):
-        lower = np.int(np.round(i * step_size))
-        upper = np.int(np.round((i+1) * step_size)) if i < buckets - 1 else data_size
-        ans.append(seq[lower:upper])
-    return ans
 
         
 # portfolio components

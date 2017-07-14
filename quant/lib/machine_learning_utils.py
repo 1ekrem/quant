@@ -130,10 +130,10 @@ def BoostingStump(x, y, estimate_intercept=True, no_of_variables=None, *args, **
     
     Input
     --------
-    x                     Pandas DataFrame or Series of predictive variables
-    y                     Pandas DataFrame or Series of target variables
-    estimate_intercept    Boolean
-    no_of_variables       integer, the number of variables to use
+    x                           Pandas DataFrame or Series of predictive variables
+    y                           Pandas DataFrame or Series of target variables
+    estimate_intercept          Boolean
+    no_of_variables             integer, the number of variables to use
 
     Output
     --------
@@ -174,6 +174,17 @@ def get_random_sequence(n_variables, forest_size, seed=0):
     return ans
 
 
+def get_cross_validation_buckets(data_size, buckets):
+    seq = get_random_sequence(data_size, 1)[0]
+    step_size = 1. * data_size / buckets
+    ans = []
+    for i in xrange(buckets):
+        lower = np.int(np.round(i * step_size))
+        upper = np.int(np.round((i+1) * step_size)) if i < buckets - 1 else data_size
+        ans.append(seq[lower:upper])
+    return ans
+
+
 def RandomBoosting(x, y, forest_size=100, estimate_intercept=True, no_of_variables=None, *args, **kwargs):
     '''
     Random forest on top of boosting
@@ -183,7 +194,7 @@ def RandomBoosting(x, y, forest_size=100, estimate_intercept=True, no_of_variabl
     sequence = get_random_sequence(np.size(myx, 1), forest_size)
     return [(seq, BoostingStump(x.iloc[:, seq], y, estimate_intercept, no_of_variables)) for seq in sequence]
     
-    
+
 # Prediction
 def StumpPrediction(x, c):
     '''
@@ -246,7 +257,7 @@ def RandomBoostingPrediction(x, ans):
     '''
     df_concat = pd.concat([BoostingPrediction(x.iloc[:, seq], model) for seq, model in ans])
     return df_concat.groupby(df_concat.index).mean()
-    
+
 
 # Strategy Components
 class Component(object):
@@ -314,3 +325,4 @@ class RandomBoostingComponent(object):
         self.model = self.core.model
         self.signal = self.core.signal
         self.normalized_signal = self.core.normalized_signal
+

@@ -117,11 +117,11 @@ def load_bloomberg_econ_change(ticker, start_date=None, end_date=None, table_nam
         return None
 
 
-def load_bloomberg_econ_annual_change(ticker, start_date=None, end_date=None, table_name=US_ECON_TABLE_NAME):
+def load_bloomberg_econ_time_change(ticker, start_date=None, end_date=None, table_name=US_ECON_TABLE_NAME, time_delta=252):
     release = load_bloomberg_econ_release(ticker, start_date, end_date, table_name)
     last = load_bloomberg_econ_last(ticker, start_date, end_date, table_name)
     if release is not None and last is not None:
-        return release - tu.resample(last.resample('B').last().ffill().shift(250), release)
+        return release - tu.resample(last.resample('B').last().ffill().shift(time_delta), release)
     else:
         return None
 
@@ -133,6 +133,23 @@ def load_bloomberg_econ_revision(ticker, start_date=None, end_date=None, table_n
         return (last - release).shift()
     else:
         return None
+
+
+def load_bloomberg_econ_combined(ticker, start_date=None, end_date=None, table_name=US_ECON_TABLE_NAME):
+    ans = []
+    release = load_bloomberg_extended_econ_release(ticker, start_date, end_date, table_name)
+    if release is not None:
+        release.name = ticker + '|release'
+        ans.append(release)
+    change = load_bloomberg_econ_time_change(ticker, start_date, end_date, table_name, 252)
+    if change is not None:
+        change.name = ticker + '|annualchange'
+        ans.append(change)
+    revision = load_bloomberg_econ_revision(ticker, start_date, end_date, table_name)
+    if revision is not None:
+        revision.name = ticker + '|revision'
+        ans.append(revision)
+    return None if len(ans) == 0 else pd.concat(ans, axis=1)
 
 
 def get_bloomberg_econ_list(table_name=US_ECON_TABLE_NAME):
@@ -153,11 +170,15 @@ def bloomberg_change_loader(tickers, start_date=None, end_date=None):
 
 
 def bloomberg_annual_change_loader(tickers, start_date=None, end_date=None):
-    return dict([(ticker, load_bloomberg_econ_annual_change(ticker, start_date, end_date)) for ticker in tickers])
+    return dict([(ticker, load_bloomberg_econ_time_change(ticker, start_date, end_date, time_delta=252)) for ticker in tickers])
 
 
 def bloomberg_revision_loader(tickers, start_date=None, end_date=None):
     return dict([(ticker, load_bloomberg_econ_revision(ticker, start_date, end_date)) for ticker in tickers])
+
+
+def bloomberg_combined_loader(tickers, start_date=None, end_date=None):
+    return dict([(ticker, load_bloomberg_econ_combined(ticker, start_date, end_date)) for ticker in tickers])
 
 
 def main():

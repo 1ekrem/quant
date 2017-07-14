@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from datetime import datetime as dt
 from matplotlib import pyplot as plt
-from quant.data import bloomberg
+from quant.data import bloomberg, fred
 from quant.lib import timeseries_utils as tu, portfolio_utils as pu, \
     machine_learning_utils as mu, visualization_utils as vu
 from quant.lib.main_utils import logger
@@ -80,9 +80,10 @@ class EconSim(object):
             param = {}
         for ticker in self.inputs:
             data = self.dataset[ticker]
-            if self.data_transform_func is not None:
-                data = self.data_transform_func(data, **param)
-            ans.append(tu.resample(data, self.timeline))
+            if data is not None:
+                if self.data_transform_func is not None:
+                    data = self.data_transform_func(data, **param)
+                ans.append(tu.resample(data, self.timeline))
         return pd.concat(ans, axis=1)
 
     def estimate_model(self, in_sample, out_of_sample, params=None):
@@ -103,7 +104,7 @@ class EconSim(object):
         return self.estimate_model(in_sample, out_of_sample, self.default_params)
 
     def run_cross_validation(self, in_sample, out_of_sample):
-        seq = pu.get_cross_validation_buckets(len(in_sample), self.cross_validation_buckets)
+        seq = mu.get_cross_validation_buckets(len(in_sample), self.cross_validation_buckets)
         selection = None
         error_rate = 100.
         for param in self.cross_validation_params:
@@ -180,6 +181,8 @@ def get_bloomberg_sim(model, input_type='release', cross_validation=False):
         input_data_loader = bloomberg.bloomberg_annual_change_loader
     elif input_type == 'revision':
         input_data_loader = bloomberg.bloomberg_revision_loader
+    elif input_type == 'combined':
+        input_data_loader = bloomberg.bloomberg_combined_loader
     if model == 'Boosting':
         strategy_component = mu.BoostingStumpComponent
     elif model == 'RandomBoosting':
@@ -192,16 +195,47 @@ def get_bloomberg_sim(model, input_type='release', cross_validation=False):
     else:
         params = {}
     sim = EconSim(assets=['SPX Index'], asset_data_loader=bloomberg.load_bloomberg_index_prices,
-                 start_date=dt(2000, 1, 1), end_date=dt(2017, 6, 1), sample_date=dt(2010, 1,1), data_frequency='M',
-                 inputs=econ, input_data_loader=input_data_loader, strategy_component=strategy_component,
-                 simple_returns=False, position_component=pu.SimpleLongOnly, simulation_name=simulation_name,
-                 data_transform_func=None, **params)
+                  start_date=dt(2000, 1, 1), end_date=dt(2017, 6, 1), sample_date=dt(2010, 1,1), data_frequency='M',
+                  inputs=econ, input_data_loader=input_data_loader, strategy_component=strategy_component,
+                  simple_returns=False, position_component=pu.SimpleLongOnly, simulation_name=simulation_name,
+                  data_transform_func=None, default_params={'span':5}, **params)
+    return sim
+
+
+def get_fred_sim(model, input_type='release', cross_validation=False):
+    econ = fred.get_fred_us_econ_list()
+    if input_type == 'release':
+        input_data_loader = fred.fred_release_loader
+    elif input_type == 'annual change':
+        input_data_loader = fred.fred_annual_change_loader
+    elif input_type == 'revision':
+        input_data_loader = fred.fred_revision_loader
+    elif input_type == 'combined':
+        input_data_loader = fred.fred_combined_loader
+    if model == 'Boosting':
+        strategy_component = mu.BoostingStumpComponent
+    elif model == 'RandomBoosting':
+        strategy_component = mu.RandomBoostingComponent
+    simulation_name = '%s %s%s' % (model, input_type, ' CV' if cross_validation else '')
+    if cross_validation:
+        params = dict(cross_validation=True,
+                      cross_validation_params=[{}] + [{'span': x} for x in np.arange(2, 27)],
+                      cross_validation_buckets=5)
+    else:
+        params = {}
+    sim = EconSim(assets=['SPX Index'], asset_data_loader=bloomberg.load_bloomberg_index_prices,
+                  start_date=dt(2000, 1, 1), end_date=dt(2017, 6, 1), sample_date=dt(2010, 1,1), data_frequency='M',
+                  inputs=econ, input_data_loader=input_data_loader, strategy_component=strategy_component,
+                  simple_returns=False, position_component=pu.SimpleLongOnly, simulation_name=simulation_name,
+                  data_transform_func=None, **params)
     return sim
 
 
 def econ_run_one(model, input_type='release', cross_validation=False, oos=False, data_source='bloomberg'):
     if data_source == 'bloomberg':
         sim = get_bloomberg_sim(model, input_type, cross_validation)
+    elif data_source == 'fred':
+        sim = get_fred_sim(model, input_type, cross_validation)
     analytics = sim.oos_analytics if oos else sim.analytics
     strategy_returns = sim.oos_strategy_returns if oos else sim.strategy_returns
     asset_returns = sim.oos_asset_returns if oos else sim.asset_returns
@@ -214,12 +248,65 @@ def econ_run_one(model, input_type='release', cross_validation=False, oos=False,
     return acc, acc0
 
 
-def run_econ_boosting(model='Boosting', oos=False, cv=False):
+def run_econ_boosting(model='Boosting', oos=False, cv=False, data_source='bloomberg'):
     accs = []
-    for input_type in ['release', 'change', 'annual change', 'revision']:
-        acc, acc0 = econ_run_one(model, input_type, cv, oos)
+    for input_type in ['release', 'annual change', 'revision', 'combined']:
+        acc, acc0 = econ_run_one(model, input_type, cv, oos, data_source)
         if len(accs) == 0:
             accs.append(acc0)
+        accs.append(acc)
+    return pd.concat(accs, axis=1)
+
+
+def run_one(model, input_type='release', data_source='bloomberg'):
+    if data_source == 'bloomberg':
+        econ = bloomberg.get_bloomberg_econ_list()
+        if input_type == 'release':
+            input_data_loader = bloomberg.bloomberg_extended_release_loader
+        elif input_type == 'annual change':
+            input_data_loader = bloomberg.bloomberg_annual_change_loader
+        elif input_type == 'revision':
+            input_data_loader = bloomberg.bloomberg_revision_loader
+        elif input_type == 'combined':
+            input_data_loader = bloomberg.bloomberg_combined_loader
+    elif data_source == 'fred':
+        econ = fred.get_fred_us_econ_list()
+        if input_type == 'release':
+            input_data_loader = fred.fred_release_loader
+        elif input_type == 'annual change':
+            input_data_loader = fred.fred_annual_change_loader
+        elif input_type == 'revision':
+            input_data_loader = fred.fred_revision_loader
+        elif input_type == 'combined':
+            input_data_loader = fred.fred_combined_loader
+    if model == 'Boosting':
+        strategy_component = mu.BoostingStumpComponent
+    elif model == 'RandomBoosting':
+        strategy_component = mu.RandomBoostingComponent
+    sr = -1
+    ans = None
+    for x in xrange(1, 27):
+        simulation_name = '%s %s [%d]' % (model, input_type, x)
+        sim = EconSim(assets=['SPX Index'], asset_data_loader=bloomberg.load_bloomberg_index_prices,
+                      start_date=dt(2000, 1, 1), end_date=dt(2017, 6, 1), sample_date=dt(2010, 1,1), data_frequency='M',
+                      inputs=econ, input_data_loader=input_data_loader, strategy_component=strategy_component,
+                      simple_returns=False, position_component=pu.SimpleLongOnly, simulation_name=simulation_name,
+                      data_transform_func=mu.pandas_weeks_ewma, default_params={'span': x})
+        analytics = sim.oos_analytics
+        strategy_returns = sim.oos_strategy_returns
+        a = analytics['SPX Index'].iloc[1, :]
+        if a.loc['sharpe'] > sr:
+            acc = (1. + strategy_returns.iloc[:, 0]).cumprod() - 1.
+            acc.name = '%s (mean: %.1f%%, std: %.1f%%, sharpe: %.2f)' % (sim.simulation_name, 100. * a.loc['mean'], 100. * a.loc['std'], a.loc['sharpe'])
+            sr = a.loc['sharpe']
+            ans = acc
+    return ans
+
+
+def run_boosting(model='Boosting', data_source='bloomberg'):
+    accs = []
+    for input_type in ['release', 'annual change', 'revision', 'combined']:
+        acc = run_one(model, input_type, data_source)
         accs.append(acc)
     return pd.concat(accs, axis=1)
 
