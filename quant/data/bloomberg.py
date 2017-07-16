@@ -4,7 +4,9 @@ Created on 22 Jun 2017
 @author: wayne
 '''
 import os
+import numpy as np
 import pandas as pd
+from datetime import datetime as dt, timedelta
 from quant.lib.main_utils import logger
 from quant.lib import timeseries_utils as tu, data_utils as du
 
@@ -12,6 +14,7 @@ DATABASE_NAME = 'quant'
 INDEX_TABLE_NAME = 'bloomberg_index_prices'
 US_ECON_TABLE_NAME = 'bloomberg_us_econ'
 ACTUAL_RELEASE = 'ACTUAL_RELEASE'
+ECO_RELEASE_DT = 'ECO_RELEASE_DT'
 PX_LAST = 'PX_LAST'
 
 
@@ -69,7 +72,7 @@ def load_bloomberg_data():
         logger.info('Loading %s' % k)
         for kk, vv in v.iteritems():
             vv.name = k + '|' + kk
-            tu.store_timeseries(vv, DATABASE_NAME, 'bloomberg_us_econ')
+            tu.store_timeseries(vv, DATABASE_NAME, US_ECON_TABLE_NAME)
 
 
 # price loader
@@ -80,31 +83,53 @@ def load_bloomberg_index_prices(tickers, start_date=None, end_date=None):
 # Bloomberg economic data
 def load_bloomberg_econ_release(ticker, start_date=None, end_date=None, table_name=US_ECON_TABLE_NAME):
     data = tu.get_timeseries(DATABASE_NAME, table_name, index_range=(start_date, end_date), column_list=[ticker + '|' + ACTUAL_RELEASE])
-    if data is not None:
+    release_date = tu.get_timeseries(DATABASE_NAME, table_name, index_range=(start_date, end_date), column_list=[ticker + '|' + ECO_RELEASE_DT])
+    if data is not None and release_date is not None:
+        release_date = release_date.drop_duplicates()
+        release_date.iloc[:, 0] = [dt.strptime(str(np.int(x)), '%Y%m%d') for x in release_date.values[:, 0]]
         data = data.iloc[:, 0]
+        data = data.loc[data.index.isin(release_date.index)]
+        data.index = release_date.loc[data.index].values[:, 0]
         data.name = ticker
     return data
 
 
 def load_bloomberg_extended_econ_release(ticker, start_date=None, end_date=None, table_name=US_ECON_TABLE_NAME):
     data = tu.get_timeseries(DATABASE_NAME, table_name, index_range=(start_date, end_date), column_list=[ticker + '|' + ACTUAL_RELEASE])
-    if data is not None:
-        data = data.iloc[:, 0]
-        data.name = ticker
+    release_date = tu.get_timeseries(DATABASE_NAME, table_name, index_range=(start_date, end_date), column_list=[ticker + '|' + ECO_RELEASE_DT])
     data2 = tu.get_timeseries(DATABASE_NAME, table_name, index_range=(start_date, end_date), column_list=[ticker + '|' + PX_LAST])
-    if data2 is not None:
+    if data is not None and release_date is not None and data2 is not None:
+        release_date = release_date.drop_duplicates()
+        release_date.iloc[:, 0] = [dt.strptime(str(np.int(x)), '%Y%m%d') for x in release_date.values[:, 0]]
+        release_date = release_date.iloc[:, 0]
+        data = data.iloc[:, 0]
+        data = data.loc[data.index.isin(release_date.index)]
+        data.name = ticker
         data2 = data2.iloc[:, 0]
         data2.name = ticker
-        idx = data.first_valid_index()
-        data = pd.concat([data2.loc[data2.index < idx], data], axis=0)
+        data2 = data2.loc[data2.index < data.first_valid_index()]
+        data.index = release_date.loc[data.index]
+        time_delta = release_date.diff().mean().days
+        data2.index += timedelta(time_delta)
+        data = pd.concat([data2, data], axis=0)
     return data
 
 
 def load_bloomberg_econ_last(ticker, start_date=None, end_date=None, table_name=US_ECON_TABLE_NAME):
     data = tu.get_timeseries(DATABASE_NAME, table_name, index_range=(start_date, end_date), column_list=[ticker + '|' + PX_LAST])
-    if data is not None:
+    release_date = tu.get_timeseries(DATABASE_NAME, table_name, index_range=(start_date, end_date), column_list=[ticker + '|' + ECO_RELEASE_DT])
+    if data is not None and release_date is not None:
+        release_date = release_date.drop_duplicates()
+        release_date.iloc[:, 0] = [dt.strptime(str(np.int(x)), '%Y%m%d') for x in release_date.values[:, 0]]
+        release_date = release_date.iloc[:, 0]
         data = data.iloc[:, 0]
         data.name = ticker
+        data2 = data.loc[data.index < release_date.first_valid_index()]
+        data = data.loc[data.index.isin(release_date.index)]
+        data.index = release_date.loc[data.index]
+        time_delta = release_date.diff().mean().days
+        data2.index += timedelta(time_delta)
+        data = pd.concat([data2, data], axis=0)
     return data
 
 
@@ -141,6 +166,10 @@ def load_bloomberg_econ_combined(ticker, start_date=None, end_date=None, table_n
     if release is not None:
         release.name = ticker + '|release'
         ans.append(release)
+    change = load_bloomberg_econ_change(ticker, start_date, end_date, table_name)
+    if change is not None:
+        change.name = ticker + '|change'
+        ans.append(change)
     change = load_bloomberg_econ_time_change(ticker, start_date, end_date, table_name, 252)
     if change is not None:
         change.name = ticker + '|annualchange'

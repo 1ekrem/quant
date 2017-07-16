@@ -5,6 +5,7 @@ Created on 23 Jun 2017
 '''
 import numpy as np
 import pandas as pd
+from scipy import stats as ss
 from quant.lib import timeseries_utils as tu
 from quant.lib.main_utils import logger
 
@@ -85,8 +86,13 @@ def DummyStump(x, y):
     neg[neg > 0] = 0.
     neg = np.cumsum(neg[::-1])
     neg = np.array(list(neg[:-1])[::-1] + [0.])
-    loc = np.argsort(np.abs(pos - neg - 0.5))[-1]
-    return np.mean(data[loc:loc+2, 0]) if loc < len(data)-1 else 1. + data[-1, 0]
+    score = np.abs(pos - neg - 0.5)
+    loc = np.argsort(score)[-1]
+    cutoff = np.mean(data[loc:loc+2, 0]) if loc < len(data)-1 else 1. + data[-1, 0]
+    ploc = 1. * loc / len(data)
+    if ploc > .5:
+        ploc = 1. - ploc
+    return cutoff, ploc, 2. * np.max(score)
 
 
 def get_weight_from_error(e):
@@ -109,10 +115,10 @@ def estimate_boosting_stump(x, y, estimate_intercept=True):
         alpha[y < 0] *= np.exp(w)
         alpha[y > 0] *= np.exp(-w)
         alpha /= np.sum(alpha)
-        ans.append([BOOSTING_INTERCEPT, y.name, np.nan, e, w])
+        ans.append([BOOSTING_INTERCEPT, y.name, np.nan, e, w, np.nan, np.nan])
     for i in np.arange(np.size(x, 1)):
         pred = x.iloc[:, i]
-        u = DummyStump(pred, y * alpha)
+        u, ploc, score = DummyStump(pred, y * alpha)
         e = StumpError(pred, y * alpha, u)
         w = get_weight_from_error(e)
         alpha[(pred < u) & (y > 0)] *= np.exp(w)
@@ -120,8 +126,8 @@ def estimate_boosting_stump(x, y, estimate_intercept=True):
         alpha[(pred < u) & (y < 0)] *= np.exp(-w)
         alpha[(pred > u) & (y > 0)] *= np.exp(-w)
         alpha /= np.sum(alpha)
-        ans.append([pred.name, y.name, u, e, w])
-    return pd.DataFrame(ans, columns=['predicative', 'target', 'estimation', 'Error', 'weight'])
+        ans.append([pred.name, y.name, u, e, w, ploc, score])
+    return pd.DataFrame(ans, columns=['predicative', 'target', 'estimation', 'Error', 'weight', 'pLoc', 'score'])
 
 
 def BoostingStump(x, y, estimate_intercept=True, no_of_variables=None, *args, **kwargs):

@@ -90,11 +90,13 @@ class EconSim(object):
         if params is None:
             params = {}
         data = self.create_estimation_data(params)
+        logger.info('Running model with %d variables' % np.size(data, 1))
         asset_returns = self._asset_returns.loc[in_sample.index]
         in_sample_data = pu.ignore_insufficient_series(data.loc[in_sample.index], len(in_sample) * self.data_missing_fail)
         if in_sample_data is None:
             return None
         else:
+            logger.info('%d series ignored due to insufficient data' % (np.size(data, 1) - np.size(in_sample_data, 1)))
             out_of_sample_data = data.loc[out_of_sample.index, in_sample_data.columns]
             return self.strategy_component(asset_returns=asset_returns,
                                            in_sample_data=in_sample_data,
@@ -198,7 +200,7 @@ def get_bloomberg_sim(model, input_type='release', cross_validation=False):
                   start_date=dt(2000, 1, 1), end_date=dt(2017, 6, 1), sample_date=dt(2010, 1,1), data_frequency='M',
                   inputs=econ, input_data_loader=input_data_loader, strategy_component=strategy_component,
                   simple_returns=False, position_component=pu.SimpleLongOnly, simulation_name=simulation_name,
-                  data_transform_func=None, default_params={'span':5}, **params)
+                  data_transform_func=None, **params)
     return sim
 
 
@@ -250,7 +252,7 @@ def econ_run_one(model, input_type='release', cross_validation=False, oos=False,
 
 def run_econ_boosting(model='Boosting', oos=False, cv=False, data_source='bloomberg'):
     accs = []
-    for input_type in ['release', 'annual change', 'revision', 'combined']:
+    for input_type in ['release', 'change', 'annual change', 'revision', 'combined']:
         acc, acc0 = econ_run_one(model, input_type, cv, oos, data_source)
         if len(accs) == 0:
             accs.append(acc0)

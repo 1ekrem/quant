@@ -15,7 +15,7 @@ DATABASE_NAME = 'quant'
 INFO_TABLE_NAME = 'fred_econ_info'
 SERIES_TABLE_NAME = 'fred_data'
 RELEASE_TABLE_NAME = 'fred_econ_data'
-TABLE_FORMAT = "time_index DATETIME, realtime_start DATETIME, series_name VARCHAR(50), value FLOAT"
+TABLE_FORMAT = "time_index DATETIME, realtime_start DATETIME, series_name VARCHAR(50), value DOUBLE"
 INFO_TABLE_FORMAT = "series_name VARCHAR(50), description VARCHAR(50), value VARCHAR(1000)"
 FREDKEY = 'ff64294203f79127f8d004d2726386ac'
 _api = fredapi.Fred(api_key=FREDKEY)
@@ -254,6 +254,25 @@ def get_fred_first_release(series_name, start_date=None, end_date=None):
         return None
 
 
+def get_fred_extended_first_release(series_name, start_date=None, end_date=None):
+    data = get_series_all_release(series_name, start_date, end_date)
+    if data is not None:
+        data = data.sort_values(['time_index', 'realtime_start'])
+        current = data.groupby('realtime_start').agg(lambda x:x.sort_values('time_index').iloc[-1])
+        ans = current['value'].copy()
+        current = current.reset_index()
+        time_delta = (current['realtime_start'] - current['time_index']).mean().days
+        historic = data.groupby('time_index').agg(lambda x:x.sort_values('realtime_start').iloc[0])
+        historic = historic.loc[historic.index < current.time_index.min()]
+        ans2 = historic['value'].copy()
+        ans2.index += timedelta(time_delta)
+        ans = pd.concat([ans2, ans], axis=0)
+        ans.name = series_name
+        return None if ans.empty else tu.remove_outliers(ans)
+    else:
+        return None
+    
+
 def get_fred_change(series_name, time_delta, start_date=None, end_date=None):
     data = get_series_all_release(series_name, start_date, end_date)
     if data is not None:
@@ -268,6 +287,15 @@ def get_fred_change(series_name, time_delta, start_date=None, end_date=None):
         release.index = release.realtime_start
         history = tu.resample(history, release)
         ans = release.value - history
+        td = (release['realtime_start'] - release['time_index']).mean().days
+        historic = data.groupby('time_index').agg(lambda x:x.sort_values('realtime_start').iloc[0])
+        historic = historic.loc[historic.index < release.time_index.min()]
+        observation = historic.value
+        pasttime = observation.copy()
+        pasttime.index -= timedelta(time_delta)
+        ans2 = pasttime - tu.resample(observation, pasttime)
+        ans2.index = observation.index + timedelta(td)
+        ans = pd.concat([ans2, ans], axis=0)
         ans.name = series_name
         return None if ans.empty else tu.remove_outliers(ans)
     else:
