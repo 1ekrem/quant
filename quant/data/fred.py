@@ -15,6 +15,7 @@ DATABASE_NAME = 'quant'
 INFO_TABLE_NAME = 'fred_econ_info'
 SERIES_TABLE_NAME = 'fred_data'
 RELEASE_TABLE_NAME = 'fred_econ_data'
+CACHE_TABLE_NAME = 'fred_cached_data'
 TABLE_FORMAT = "time_index DATETIME, realtime_start DATETIME, series_name VARCHAR(50), value DOUBLE"
 INFO_TABLE_FORMAT = "series_name VARCHAR(50), description VARCHAR(50), value VARCHAR(1000)"
 FREDKEY = 'ff64294203f79127f8d004d2726386ac'
@@ -225,37 +226,15 @@ def get_series_all_release(series_name, start_date=None, end_date=None):
         logger.warning('Failed to read data: ' + str(data))
 
 
-def download_all_releases():
-    for series_name in US_ECON + CHINA_ECON + EU_ECON:
-        download_and_store_series_all_releases(series_name)
-
-
-def download_all_series():
-    for series_name in US_SERIES:
-        download_and_store_series(series_name)
-
-
-# data loader
-def get_fred_us_econ_list():
-    return US_ECON
-
-
-def get_fred_global_econ_list():
-    return US_ECON + CHINA_ECON + EU_ECON
-
-
-def get_fred_first_release(series_name, start_date=None, end_date=None):
-    data = get_series_all_release(series_name, start_date, end_date)
+def calculate_first_release(data):
     if data is not None:
         ans = data.groupby('realtime_start').agg(lambda x:x.sort_values('time_index').iloc[-1]).sort_index()['value']
-        ans.name = series_name
         return None if ans.empty else tu.remove_outliers(ans)
     else:
         return None
 
 
-def get_fred_extended_first_release(series_name, start_date=None, end_date=None):
-    data = get_series_all_release(series_name, start_date, end_date)
+def calculate_extended_first_release(data):
     if data is not None:
         data = data.sort_values(['time_index', 'realtime_start'])
         current = data.groupby('realtime_start').agg(lambda x:x.sort_values('time_index').iloc[-1])
@@ -267,14 +246,15 @@ def get_fred_extended_first_release(series_name, start_date=None, end_date=None)
         ans2 = historic['value'].copy()
         ans2.index += timedelta(time_delta)
         ans = pd.concat([ans2, ans], axis=0)
-        ans.name = series_name
         return None if ans.empty else tu.remove_outliers(ans)
     else:
         return None
-    
 
-def get_fred_change(series_name, time_delta, start_date=None, end_date=None):
-    data = get_series_all_release(series_name, start_date, end_date)
+
+def calculate_change(data, time_delta):
+    '''
+    time_delta is calendar days
+    '''
     if data is not None:
         data = data.sort_values(['time_index', 'realtime_start'])
         release = data.groupby('realtime_start').agg(lambda x:x.sort_values('time_index').iloc[-1]).reset_index()
@@ -296,14 +276,12 @@ def get_fred_change(series_name, time_delta, start_date=None, end_date=None):
         ans2 = pasttime - tu.resample(observation, pasttime)
         ans2.index = observation.index + timedelta(td)
         ans = pd.concat([ans2, ans], axis=0)
-        ans.name = series_name
         return None if ans.empty else tu.remove_outliers(ans)
     else:
         return None
-        
 
-def get_fred_revision(series_name, start_date=None, end_date=None):
-    data = get_series_all_release(series_name, start_date, end_date)
+
+def calculate_revision(data):
     if data is not None:
         data = data.sort_values(['time_index', 'realtime_start'])
         data['diff'] = data.value.diff()
@@ -312,20 +290,104 @@ def get_fred_revision(series_name, start_date=None, end_date=None):
         data = data.groupby('realtime_start').agg(lambda x:x.sort_values('time_index').iloc[-1]).reset_index()
         data = data.groupby('time_index').first().reset_index()
         ans = data['diff']
-        ans.name = series_name
         ans.index = data.realtime_start
         return None if ans.empty else tu.remove_outliers(ans)
     else:
         return None
 
 
+def cache_series_release_data(series_name):
+    logger.info('Caching derived series release data - %s' % series_name)
+    data = get_series_all_release(series_name)
+    if data is not None:
+        ans = []
+        release = calculate_first_release(data)
+        if release is not None:
+            release.name = series_name + '|release'
+            ans.append(release)
+        release = calculate_extended_first_release(data)
+        if release is not None:
+            release.name = series_name + '|extendedrelease'
+            ans.append(release)
+        change = calculate_change(data, 5)
+        if change is not None:
+            change.name = series_name + '|change'
+            ans.append(change)
+        change = calculate_change(data, 365)
+        if change is not None:
+            change.name = series_name + '|annualchange'
+            ans.append(change)
+        revision = calculate_revision(data)
+        if revision is not None:
+            revision.name = series_name + '|revision'
+            ans.append(revision)
+        if len(ans)>0:
+            ans = pd.concat(ans, axis=1)
+            tu.store_timeseries(ans, DATABASE_NAME, CACHE_TABLE_NAME)
+
+
+def download_all_releases():
+    for series_name in US_ECON + CHINA_ECON + EU_ECON:
+        download_and_store_series_all_releases(series_name)
+        cache_series_release_data(series_name)
+
+
+def download_all_series():
+    for series_name in US_SERIES:
+        download_and_store_series(series_name)
+
+
+# data loader
+def get_fred_us_econ_list():
+    return US_ECON
+
+
+def get_fred_global_econ_list():
+    return US_ECON + CHINA_ECON + EU_ECON
+
+
+def get_cached_data(series_name, data_type, start_date=None, end_date=None):
+    column = series_name + '|' + data_type
+    ans = tu.get_timeseries(DATABASE_NAME, CACHE_TABLE_NAME, index_range=(start_date, end_date), column_list=[column])
+    if ans is None:
+        return None
+    else:
+        ans = ans.iloc[:, 0]
+        ans.name = series_name
+        return ans
+
+
+def get_fred_first_release(series_name, start_date=None, end_date=None):
+    return get_cached_data(series_name, 'release', start_date, end_date)
+
+
+def get_fred_extended_first_release(series_name, start_date=None, end_date=None):
+    return get_cached_data(series_name, 'extendedrelease', start_date, end_date)
+    
+
+def get_fred_change(series_name, start_date=None, end_date=None):
+    return get_cached_data(series_name, 'change', start_date, end_date)
+
+
+def get_fred_annual_change(series_name, start_date=None, end_date=None):
+    return get_cached_data(series_name, 'annualchange', start_date, end_date)
+
+
+def get_fred_revision(series_name, start_date=None, end_date=None):
+    return get_cached_data(series_name, 'revision', start_date, end_date)
+
+
 def get_fred_combined(series_name, start_date=None, end_date=None):
     ans = []
-    release = get_fred_first_release(series_name, start_date, end_date)
+    release = get_fred_extended_first_release(series_name, start_date, end_date)
     if release is not None:
         release.name = series_name + '|release'
         ans.append(release)
-    change = get_fred_change(series_name, 365, start_date, end_date)
+    change = get_fred_change(series_name, start_date, end_date)
+    if change is not None:
+        change.name = series_name + '|change'
+        ans.append(change)
+    change = get_fred_annual_change(series_name, start_date, end_date)
     if change is not None:
         change.name = series_name + '|annualchange'
         ans.append(change)
@@ -337,11 +399,15 @@ def get_fred_combined(series_name, start_date=None, end_date=None):
 
 
 def fred_release_loader(tickers, start_date=None, end_date=None):
-    return dict([(ticker, get_fred_first_release(ticker, start_date, end_date)) for ticker in tickers])
+    return dict([(ticker, get_fred_extended_first_release(ticker, start_date, end_date)) for ticker in tickers])
 
 
-def fred_annual_change_loader(tickers, start_date=None, end_date=None, time_delta=365):
-    return dict([(ticker, get_fred_change(ticker, time_delta, start_date, end_date)) for ticker in tickers])
+def fred_change_loader(tickers, start_date=None, end_date=None):
+    return dict([(ticker, get_fred_change(ticker, start_date, end_date)) for ticker in tickers])
+
+
+def fred_annual_change_loader(tickers, start_date=None, end_date=None):
+    return dict([(ticker, get_fred_annual_change(ticker, start_date, end_date)) for ticker in tickers])
 
 
 def fred_revision_loader(tickers, start_date=None, end_date=None):
@@ -350,7 +416,6 @@ def fred_revision_loader(tickers, start_date=None, end_date=None):
 
 def fred_combined_loader(tickers, start_date=None, end_date=None):
     return dict([(ticker, get_fred_combined(ticker, start_date, end_date)) for ticker in tickers])
-
 
 
 def main():

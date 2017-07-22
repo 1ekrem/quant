@@ -21,11 +21,10 @@ class EconSim(object):
     '''
     Pension Simulation
     '''
-    def __init__(self, start_date, end_date, sample_date, data_frequency, assets, asset_data_loader,
-                 inputs, input_data_loader, strategy_component, position_component, simulation_name,
-                 data_transform_func=None, default_params=None, data_missing_fail=DATA_MISSING_FAIL,
-                 simple_returns=False, cross_validation=False, cross_validation_params=None,
-                 cross_validation_buckets=5):
+    def __init__(self, start_date, end_date, sample_date, data_frequency, forecast_horizon, assets,
+                 asset_data_loader, inputs, input_data_loader, strategy_component, position_component,
+                 simulation_name, data_transform_func=None, default_params=None, data_missing_fail=DATA_MISSING_FAIL,
+                 simple_returns=False, cross_validation=False, cross_validation_params=None, cross_validation_buckets=5):
         self.simulation_name = simulation_name
         self.assets = assets
         self.asset_data_loader = asset_data_loader
@@ -38,12 +37,14 @@ class EconSim(object):
         self.end_date = end_date
         self.sample_date = sample_date
         self.data_frequency = data_frequency
+        self.forecast_horizon = forecast_horizon
         self.strategy_component = strategy_component
         self.position_component = position_component
         self.simple_returns = simple_returns
         self.cross_validation = cross_validation
         self.cross_validation_params = cross_validation_params
         self.cross_validation_buckets = cross_validation_buckets
+        assert self.forecast_horizon > 0
         self.run_sim()
 
     def run_sim(self):
@@ -66,9 +67,10 @@ class EconSim(object):
         self.asset_prices = self.asset_data_loader(self.assets, start_date=self._load_start, end_date=self._load_end)
         p = tu.resample(self.asset_prices, self.timeline)
         if self.simple_returns:
-            self._asset_returns = p.diff()
+            asset_returns = p.diff(self.forecast_horizon)
         else:
-            self._asset_returns = p.diff() / p.shift()
+            asset_returns = p.diff(self.forecast_horizon) / p.shift(self.forecast_horizon)
+        self._asset_returns = asset_returns.shift(-self.forecast_horizon)
 
     def load_input_data(self):
         logger.info('Loading input data')
@@ -154,9 +156,10 @@ class EconSim(object):
         logger.info('Simulating strategy returns')
         p = self.asset_prices.resample('B').last().ffill()
         self.asset_returns = p.diff() if self.simple_returns else p.diff() / p.shift()
-        self.positions = self.position_component(**{'signal': self.signal, 'normalized_signal': self.normalized_signal})
+        positions = self.position_component(**{'signal': self.signal, 'normalized_signal': self.normalized_signal})
+        self.positions = tu.resample(positions, self.asset_returns).fillna(0.).shift()
         start_date = self.start_date if self.start_date > self.positions.first_valid_index() else self.positions.first_valid_index()
-        self.strategy_returns = tu.resample(self.positions, self.asset_returns).shift() * self.asset_returns
+        self.strategy_returns = self.positions.shift() * self.asset_returns
         self.strategy_returns = self.strategy_returns[start_date:]
         self.oos_strategy_returns = self.strategy_returns[self.sample_date:]
         self.asset_returns = self.asset_returns[start_date:]
@@ -197,10 +200,10 @@ def get_bloomberg_sim(model, input_type='release', cross_validation=False):
     else:
         params = {}
     sim = EconSim(assets=['SPX Index'], asset_data_loader=bloomberg.load_bloomberg_index_prices,
-                  start_date=dt(2000, 1, 1), end_date=dt(2017, 6, 1), sample_date=dt(2010, 1,1), data_frequency='M',
-                  inputs=econ, input_data_loader=input_data_loader, strategy_component=strategy_component,
-                  simple_returns=False, position_component=pu.SimpleLongOnly, simulation_name=simulation_name,
-                  data_transform_func=None, **params)
+                  start_date=dt(2000, 1, 1), end_date=dt(2017, 6, 1), sample_date=dt(2010, 1,1), data_frequency='1',
+                  forecast_horizon=1, inputs=econ, input_data_loader=input_data_loader,
+                  strategy_component=strategy_component, simple_returns=False, position_component=pu.SimpleLongOnly,
+                  simulation_name=simulation_name, data_transform_func=mu.pandas_weeks_ewma, **params)
     return sim
 
 
@@ -208,6 +211,8 @@ def get_fred_sim(model, input_type='release', cross_validation=False):
     econ = fred.get_fred_us_econ_list()
     if input_type == 'release':
         input_data_loader = fred.fred_release_loader
+    elif input_type == 'change':
+        input_data_loader = fred.fred_change_loader
     elif input_type == 'annual change':
         input_data_loader = fred.fred_annual_change_loader
     elif input_type == 'revision':
@@ -221,15 +226,15 @@ def get_fred_sim(model, input_type='release', cross_validation=False):
     simulation_name = '%s %s%s' % (model, input_type, ' CV' if cross_validation else '')
     if cross_validation:
         params = dict(cross_validation=True,
-                      cross_validation_params=[{}] + [{'span': x} for x in np.arange(2, 27)],
+                      cross_validation_params=[{}] + [{'span': x} for x in np.arange(1, 27)],
                       cross_validation_buckets=5)
     else:
         params = {}
     sim = EconSim(assets=['SPX Index'], asset_data_loader=bloomberg.load_bloomberg_index_prices,
-                  start_date=dt(2000, 1, 1), end_date=dt(2017, 6, 1), sample_date=dt(2010, 1,1), data_frequency='M',
-                  inputs=econ, input_data_loader=input_data_loader, strategy_component=strategy_component,
+                  start_date=dt(2000, 1, 1), end_date=dt(2017, 6, 1), sample_date=dt(2010, 1,1), data_frequency='1',
+                  forecast_horizon=1, inputs=econ, input_data_loader=input_data_loader, strategy_component=strategy_component,
                   simple_returns=False, position_component=pu.SimpleLongOnly, simulation_name=simulation_name,
-                  data_transform_func=None, **params)
+                  data_transform_func=mu.pandas_weeks_ewma, **params)
     return sim
 
 
