@@ -7,7 +7,7 @@ import sys
 import fredapi
 import numpy as np
 import pandas as pd
-from datetime import datetime as dt, timedelta
+from datetime import timedelta
 from quant.lib import data_utils as du, timeseries_utils as tu
 from quant.lib.main_utils import logger
 
