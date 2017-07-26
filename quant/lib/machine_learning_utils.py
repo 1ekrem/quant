@@ -281,12 +281,13 @@ class Component(object):
 
     '''    
     def __init__(self, asset_returns, in_sample_data, out_of_sample_data, model_function, 
-                 prediction_function, params=None):
+                 prediction_function, params=None, model=None, *args, **kwargs):
         self.asset_returns = asset_returns
         self.in_sample_data = in_sample_data
         self.out_of_sample_data = out_of_sample_data
         self.model_function = model_function
         self.prediction_function = prediction_function
+        self.model = model
         self.params = {} if params is None else params
         self.run_model()
 
@@ -304,7 +305,8 @@ class Component(object):
         self._z = out_of_sample_data.fillna(out_of_sample_data.median(axis=0))
 
     def estimate_model(self):
-        self.model = self.model_function(x=self._x, y=self._y, **self.params)
+        if self.model is None:
+            self.model = self.model_function(x=self._x, y=self._y, **self.params)
     
     def calculate_signals(self):
         in_sample_signal = self.prediction_function(x=self._x, ans=self.model)
@@ -314,20 +316,20 @@ class Component(object):
 
 
 class BoostingStumpComponent(object):
-    def __init__(self, asset_returns, in_sample_data, out_of_sample_data, params=None):
+    def __init__(self, asset_returns, in_sample_data, out_of_sample_data, params=None, model=None):
         self.core = Component(asset_returns, in_sample_data, out_of_sample_data,
                               model_function=BoostingStump, prediction_function=BoostingPrediction,
-                              params=params)
+                              params=params, model=model)
         self.model = self.core.model
         self.signal = self.core.signal
         self.normalized_signal = self.core.normalized_signal
 
 
 class RandomBoostingComponent(object):
-    def __init__(self, asset_returns, in_sample_data, out_of_sample_data, params=None):
+    def __init__(self, asset_returns, in_sample_data, out_of_sample_data, params=None, model=None):
         self.core = Component(asset_returns, in_sample_data, out_of_sample_data,
                               model_function=RandomBoosting, prediction_function=RandomBoostingPrediction,
-                              params=params)
+                              params=params, model=model)
         self.model = self.core.model
         self.signal = self.core.signal
         self.normalized_signal = self.core.normalized_signal

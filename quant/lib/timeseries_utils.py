@@ -35,12 +35,13 @@ def remove_outliers(data, z=10, lookback=10, min_periods=5):
     return ans
 
 
-def store_timeseries(ts, database_name, table_name):
-    du.pandas_bulk_insert(ts, database_name, table_name, du.TIMESERIES_COLUMN_NAME, du.TIMESERIES_INDEX_NAME, du.TIMESERIES_VALUE_NAME)
+def store_timeseries(ts, database_name, table_name, data_name=None):
+    du.pandas_bulk_insert(ts, database_name, table_name, du.TIMESERIES_COLUMN_NAME, du.TIMESERIES_INDEX_NAME,
+                          du.TIMESERIES_VALUE_NAME, data_name, du.TIMESERIES_DATA_NAME)
 
 
-def get_timeseries(database_name, table_name, index_range=None, column_list=None):
-    return du.pandas_read(database_name, table_name, du.TIMESERIES_COLUMN_NAME, du.TIMESERIES_INDEX_NAME, du.TIMESERIES_VALUE_NAME, index_range, column_list)
+def get_timeseries(database_name, table_name, index_range=None, column_list=None, data_name=None):
+    return du.pandas_read(database_name, table_name, du.TIMESERIES_COLUMN_NAME, du.TIMESERIES_INDEX_NAME, du.TIMESERIES_VALUE_NAME, index_range, column_list, data_name)
 
 
 def get_distribution_parameters(data):

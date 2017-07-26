@@ -3,6 +3,8 @@ Created on 22 Jun 2017
 
 @author: wayne
 '''
+import os
+import cPickle as pickle
 import numpy as np
 import pandas as pd
 from datetime import datetime as dt
@@ -22,9 +24,12 @@ class EconSim(object):
     '''
     def __init__(self, start_date, end_date, sample_date, data_frequency, forecast_horizon, assets,
                  asset_data_loader, inputs, input_data_loader, strategy_component, position_component,
-                 simulation_name, data_transform_func=None, default_params=None, data_missing_fail=DATA_MISSING_FAIL,
-                 simple_returns=False, cross_validation=False, cross_validation_params=None, cross_validation_buckets=5):
+                 simulation_name, model_path='', load_model=False, data_transform_func=None,
+                 default_params=None, data_missing_fail=DATA_MISSING_FAIL, simple_returns=False,
+                 cross_validation=False, cross_validation_params=None, cross_validation_buckets=5):
         self.simulation_name = simulation_name
+        self.model_path = model_path
+        self.load_model = load_model
         self.assets = assets
         self.asset_data_loader = asset_data_loader
         self.inputs = inputs
@@ -87,7 +92,10 @@ class EconSim(object):
                 ans.append(tu.resample(data, self.timeline))
         return pd.concat(ans, axis=1)
 
-    def estimate_model(self, in_sample, out_of_sample, params=None):
+    def estimate_model(self, in_sample, out_of_sample, params=None, model=None):
+        '''
+        When model is passed, it will be used by the strategy component
+        '''
         if params is None:
             params = {}
         data = self.create_estimation_data(params)
@@ -99,9 +107,8 @@ class EconSim(object):
         else:
             logger.info('%d series ignored due to insufficient data' % (np.size(data, 1) - np.size(in_sample_data, 1)))
             out_of_sample_data = data.loc[out_of_sample.index, in_sample_data.columns]
-            return self.strategy_component(asset_returns=asset_returns,
-                                           in_sample_data=in_sample_data,
-                                           out_of_sample_data=out_of_sample_data, params=params)
+            return self.strategy_component(asset_returns=asset_returns, in_sample_data=in_sample_data,
+                                           out_of_sample_data=out_of_sample_data, params=params, model=model)
 
     def run_without_cross_validation(self, in_sample, out_of_sample):
         return self.estimate_model(in_sample, out_of_sample, self.default_params)
@@ -131,12 +138,31 @@ class EconSim(object):
             return None, None, None
         else:
             return selection, self.estimate_model(in_sample, out_of_sample, selection), error_rate
-        
+
+    def get_model_filename(self):
+        return '%s/%s.model' % (self.model_path, self.simulation_name)
+
+    def load_existing_model(self, in_sample, out_of_sample):
+        filename = self.get_model_filename()
+        model = None
+        if os.path.isfile(filename):
+            with open(filename, 'rb') as f:
+                model = pickle.load(f)
+                f.close()
+        else:
+            logger.warn('Could not find model file %s' % filename)
+        if model is None:
+            return None
+        else:
+            return self.estimate_model(in_sample, out_of_sample, self.default_params, model)
+
     def run_simulation_sequence(self):
         in_sample = self.timeline.copy()
         in_sample = in_sample.loc[in_sample.index <= self.sample_date]
         out_of_sample = self.timeline.copy()
-        if self.cross_validation:
+        if self.load_model:
+            comp = self.load_existing_model(in_sample, out_of_sample)
+        elif self.cross_validation:
             selection, comp, error_rate = self.run_cross_validation(in_sample, out_of_sample)
             if selection is not None:
                 logger.info('Error rate %.1f%% at %s' % (100. * error_rate, str(selection)))
@@ -145,11 +171,20 @@ class EconSim(object):
         else:
             comp = self.run_without_cross_validation(in_sample, out_of_sample)
         if comp is None:
-            logger.info('Insufficient data, ignored')
+            logger.info('Failed to run model signal')
+            self.model = None
         else:
             self.model = comp.model
             self.signal = comp.signal
             self.normalized_signal = comp.normalized_signal
+
+    def pickle_model(self):
+        filename = self.get_model_filename()
+        if self.model is not None:
+            logger.info('Exporting model')
+            with open(filename, 'wb') as f:
+                pickle.dump(self.model, f)
+                f.close()
 
     def calculate_returns(self):
         logger.info('Simulating strategy returns')

@@ -18,55 +18,69 @@ PASSWORD = ''
 # SQL COMMANDS
 TIMESERIES_INDEX_NAME = 'time_index'
 TIMESERIES_COLUMN_NAME = 'column_name'
+TIMESERIES_DATA_NAME = 'data_name'
 TIMESERIES_VALUE_NAME = 'value'
 DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 CREATE_TABLE_IF_NOT_EXISTS = "CREATE TABLE IF NOT EXISTS %s (%s);"
 TIMESERIES_TABLE_FORMAT = "time_index DATETIME, column_name VARCHAR(50), value DOUBLE"
+T2_TIMESERIES_TABLE_FORMAT = "time_index DATETIME, data_name VARCHAR(50), column_name VARCHAR(50), value DOUBLE"
 BULK_TABLE_INSERT = "INSERT INTO %s %s VALUES %s;"
 BULK_TABLE_DELETE = "DELETE FROM %s WHERE %s in (%s);"
 READ_TABLE = "SELECT %s FROM %s %s;"
 READ_COLUMN_VALUES = "SELECT DISTINCT(%s) FROM %s;"
 
 
-def _series_to_insert_sql(s):
+def _series_to_insert_sql(s, data_name=None):
     name = s.name
     data = s.dropna().astype('str')
     if isinstance(data.index, pd.DatetimeIndex):
         data.index = data.index.strftime(DATETIME_FORMAT)
-    return ', '.join(['''("%s", "%s", "%s")''' % (k, name, v) for k, v in data.to_dict().iteritems()])
+    if data_name is None:
+        return ', '.join(['''("%s", "%s", "%s")''' % (k, name, v) for k, v in data.to_dict().iteritems()])
+    else:
+        return ', '.join(['''("%s", "%s", "%s", "%s")''' % (k, data_name, name, v) for k, v in data.to_dict().iteritems()])
 
 
-def _series_to_delete_sql(s):
+def _series_to_delete_sql(s, data_name=None):
     name = s.name
     data = s.dropna().astype('str')
     if isinstance(data.index, pd.DatetimeIndex):
         data.index = data.index.strftime(DATETIME_FORMAT)
-    return ', '.join(['''("%s", "%s")''' % (k, name) for k in data.index])
+    if data_name is None:
+        return ', '.join(['''("%s", "%s")''' % (k, name) for k in data.index])
+    else:
+        return ', '.join(['''("%s", "%s", "%s")''' % (k, data_name, name) for k in data.index])
 
 
-def get_insert_sql_from_pandas(data):
+def get_insert_sql_from_pandas(data, data_name=None):
     if isinstance(data, pd.Series):
-        return _series_to_insert_sql(data)
+        return _series_to_insert_sql(data, data_name)
     elif isinstance(data, pd.DataFrame):
-        ans = [_series_to_insert_sql(data.iloc[:, i]) for i in xrange(np.size(data, 1))]
+        ans = [_series_to_insert_sql(data.iloc[:, i], data_name) for i in xrange(np.size(data, 1))]
         return ', '.join([s for s in ans if len(s)>0])
     else:
         return ''
 
 
-def get_delete_sql_from_pandas(data):
+def get_delete_sql_from_pandas(data, data_name=None):
     if isinstance(data, pd.Series):
-        return _series_to_delete_sql(data)
+        return _series_to_delete_sql(data, data_name)
     elif isinstance(data, pd.DataFrame):
-        ans = [_series_to_delete_sql(data.iloc[:, i]) for i in xrange(np.size(data, 1))]
+        ans = [_series_to_delete_sql(data.iloc[:, i], data_name) for i in xrange(np.size(data, 1))]
         return ', '.join([s for s in ans if len(s)>0])
     else:
         return ''
 
 
-def get_pandas_bulk_insert_script(data, table_name, column_name, index_name, value_name):
-    insert_value_script = get_insert_sql_from_pandas(data)
-    insert_format_script = '(%s, %s, %s)' % (index_name, column_name, value_name)
+def get_pandas_bulk_insert_script(data, table_name, column_name, index_name, value_name, data_name=None, data_column_name=None):
+    '''
+    Built to handle T1 and T2 timeseries format
+    '''
+    insert_value_script = get_insert_sql_from_pandas(data, data_name)
+    if data_name is None:
+        insert_format_script = '(%s, %s, %s)' % (index_name, column_name, value_name)
+    else:
+        insert_format_script = '(%s, %s, %s, %s)' % (index_name, data_column_name, column_name, value_name)
     if len(insert_value_script) > 0:
         insert_script = BULK_TABLE_INSERT % (table_name, insert_format_script, insert_value_script)
     else:
@@ -74,9 +88,15 @@ def get_pandas_bulk_insert_script(data, table_name, column_name, index_name, val
     return insert_script
 
 
-def get_pandas_bulk_delete_script(data, table_name, column_name, index_name):
-    delete_value_script = get_delete_sql_from_pandas(data)
-    delete_format_script = '(%s, %s)' % (index_name, column_name)
+def get_pandas_bulk_delete_script(data, table_name, column_name, index_name, data_name=None, data_column_name=None):
+    '''
+    Built to handle T1 and T2 timeseries format
+    '''
+    delete_value_script = get_delete_sql_from_pandas(data, data_name)
+    if data_name is None:
+        delete_format_script = '(%s, %s)' % (index_name, column_name)
+    else:
+        delete_format_script = '(%s, %s, %s)' % (index_name, data_column_name, column_name)
     if len(delete_value_script) > 0:
         delete_script = BULK_TABLE_DELETE % (table_name, delete_format_script, delete_value_script)
     else:
@@ -84,8 +104,10 @@ def get_pandas_bulk_delete_script(data, table_name, column_name, index_name):
     return delete_script
 
 
-def get_pandas_select_condition_script(index_name, column_name, index_range, column_list):
+def get_pandas_select_condition_script(index_name, column_name, index_range, column_list, data_name=None):
     conditions = []
+    if data_name is not None:
+        conditions.append("data_name = '%s'" % data_name)
     if isinstance(index_range, tuple) and len(index_range) == 2:
         lower, higher = index_range
         if lower is not None:
@@ -100,9 +122,9 @@ def get_pandas_select_condition_script(index_name, column_name, index_range, col
         return ''
 
 
-def get_pandas_read_script(table_name, column_name, index_name, value_name, index_range=None, column_list=None):
+def get_pandas_read_script(table_name, column_name, index_name, value_name, index_range=None, column_list=None, data_name=None):
     read_format_script = '%s, %s, %s' % (column_name, index_name, value_name)
-    condition_script = get_pandas_select_condition_script(index_name, column_name, index_range, column_list)
+    condition_script = get_pandas_select_condition_script(index_name, column_name, index_range, column_list, data_name)
     return READ_TABLE % (read_format_script, table_name, condition_script)
 
 
@@ -156,13 +178,17 @@ def create_timeseries_table(database_name, table_name):
     create_table(database_name, table_name, TIMESERIES_TABLE_FORMAT)
 
 
-def pandas_bulk_insert(data, database_name, table_name, column_name, index_name, value_name):
-    delete_script = get_pandas_bulk_delete_script(data, table_name, column_name, index_name)
+def create_t2_timeseries_table(database_name, table_name):
+    create_table(database_name, table_name, T2_TIMESERIES_TABLE_FORMAT)
+
+
+def pandas_bulk_insert(data, database_name, table_name, column_name, index_name, value_name, data_name=None, data_column_name=None):
+    delete_script = get_pandas_bulk_delete_script(data, table_name, column_name, index_name, data_name, data_column_name)
     e = execute_sql_input_script(database_name, delete_script)
     if e is not None:
         logger.warning('Failed to clear data from table: ' + str(e))
     else:
-        insert_script = get_pandas_bulk_insert_script(data, table_name, column_name, index_name, value_name)
+        insert_script = get_pandas_bulk_insert_script(data, table_name, column_name, index_name, value_name, data_name, data_column_name)
         e = execute_sql_input_script(database_name, insert_script)
         if e is not None:
             logger.warning('Failed to insert data: ' + str(e))
@@ -173,8 +199,8 @@ def get_pandas_output(data, column_name, index_name, value_name):
     return output.pivot(index_name, column_name, value_name).sort_index().fillna(np.nan)
 
 
-def pandas_read(database_name, table_name, column_name, index_name, value_name, index_range=None, column_list=None):
-    read_script = get_pandas_read_script(table_name, column_name, index_name, value_name, index_range, column_list)
+def pandas_read(database_name, table_name, column_name, index_name, value_name, index_range=None, column_list=None, data_name=None):
+    read_script = get_pandas_read_script(table_name, column_name, index_name, value_name, index_range, column_list, data_name)
     success, data = execute_sql_output_script(database_name, read_script)
     if success:
         return get_pandas_output(data, column_name, index_name, value_name) if len(data)>0 else None
