@@ -73,6 +73,13 @@ def NormalizedSimpleLongOnly(normalized_signal, *args, **kwargs):
     return 1. * (normalized_signal > 0.5)
 
 
+def SimpleLongShort(signal, *args, **kwargs):
+    '''
+    Simple long-only positions
+    '''
+    return np.sign(signal)
+
+
 # performance analytics
 def calc_mean(returns):
     return 52. * returns.resample('W').sum().mean(axis=0)
@@ -90,6 +97,15 @@ def get_returns_analytics(returns):
     ans =  pd.concat([calc_mean(returns), calc_std(returns), calc_sharpe(returns)], axis=1)
     ans.columns = ['mean', 'std', 'sharpe']
     return ans
+
+
+def _calc_drawdown(returns):
+    c = returns.cumsum().ffill().fillna(0.)
+    return pd.Series([c.iloc[i] - c.ix[:i+1].max() for i in xrange(len(c))], index=returns.index, name=returns.name)
+
+
+def calc_drawdown(returns):
+    return _calc_drawdown(returns) if isinstance(returns, pd.Series) else returns.apply(_calc_drawdown, axis=0)
 
 
 # Simulations

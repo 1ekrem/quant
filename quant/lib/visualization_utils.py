@@ -63,9 +63,52 @@ def axis_area_plot(ts, color=COLORMAP[0]):
     else:
         data = ts
     data = tu.ts_interpolate(data)
-    plt.fill_between(data[data>=0].index, np.zeros(len(data[data>=0])), data[data>=0].values, color=color, alpha=0.5)
-    plt.fill_between(data[data<=0].index, np.zeros(len(data[data<=0])), data[data<=0].values, color=color, alpha=0.5)
-    data.plot(lw=2, color=color)
+    if (data>0.).any():
+        tmp = data.copy()
+        tmp[tmp < 0.] = 0.
+        plt.fill_between(tmp.index, np.zeros(len(tmp)), tmp.values, color=color, alpha=0.5)
+    if (data<0.).any():
+        tmp = data.copy()
+        tmp[tmp > 0.] = 0.
+        plt.fill_between(tmp.index, tmp.values, np.zeros(len(tmp)), color=color, alpha=0.5)
+    plt.plot(data.index, data.values, color=color, label=data.name, lw=2)
+
+
+def get_monthly_index(index):
+    '''
+    For visualization
+    '''
+    ans = []
+    for i in xrange(len(index)):
+        tmp = index[i].strftime('%d')
+        if i > 0:
+            if index[i].month != index[i-1].month:
+                tmp += index[i].strftime('\n%b')
+        ans.append(tmp)
+    return ans
+
+
+def bar_plot(data, format_func=None):
+    '''
+    Series by row
+    '''
+    if isinstance(data, pd.Series):
+        data = pd.DataFrame(np.array([data.values]), columns=data.index, index=[data.name])
+    data = data.fillna(0.)
+    n, k = np.shape(data)
+    if n>1:
+        recs = []
+        for i in range(n):
+            plt.bar(np.arange(k) * (n+1) + i, data.iloc[i], align='center', color=COLORMAP[i], edgecolor=COLORMAP[i])
+            recs.append(plt.Rectangle((0,0),1,1, color=COLORMAP[i]))
+        plt.xticks(np.arange(k) * (n+1) + n/2, data.columns if format_func is None else format_func(data.columns))
+        plt.xlim((-1, k * (n+1)))
+        plt.legend(recs, list(data.index), frameon=False, loc='best', prop={'size': 9})
+    else:
+        plt.bar(np.arange(k), data.iloc[0], align='center', color=COLORMAP[0], edgecolor=COLORMAP[0])
+        plt.xticks(np.arange(k), data.columns if format_func is None else format_func(data.columns))
+        plt.xlim((-1, k))
+    plt.axhline(0., color='grey')
 
 
 def use_monthly_ticks(data):
@@ -76,6 +119,17 @@ def use_monthly_ticks(data):
         plt.xticks(idx, txt, rotation=0, ha='center')
 
 
+def use_annual_ticks(data):
+    idx = data.resample('B').last().index
+    idx = [idx[i + 1] for i in xrange(len(idx)-1) if idx[i].year != idx[i+1].year]
+    if len(idx) > 0:
+        txt = [dt.strftime(x, '%y') for x in idx]
+        plt.xticks(idx, txt, rotation=0, ha='center')
+
+
 def highlight_last_observation(data, color='green'):
     s = data if isinstance(data, pd.Series) else data.iloc[:, 0]
     plt.plot([data.index[-1]], [data.values[-1]], marker='s', color=color)
+    plt.axhline(data.values[-1], color=color)
+    txt = '%s: %.2f' % (data.index[-1].strftime('%b %d, %Y'), data.values[-1])
+    plt.text(data.index[-1], data.values[-1], txt, va='bottom', ha='right')

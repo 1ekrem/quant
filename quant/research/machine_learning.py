@@ -211,7 +211,7 @@ class EconSim(object):
             self.oos_analytics[asset] = pu.get_returns_analytics(rtn[self.sample_date:])
 
 
-def get_bloomberg_sim(model, input_type='release', cross_validation=False, frequency='M'):
+def get_bloomberg_sim(model, input_type='release', cross_validation=False, frequency='M', long_short=False):
     econ = bloomberg.get_bloomberg_econ_list()
     if input_type == 'release':
         input_data_loader = bloomberg.bloomberg_extended_release_loader
@@ -228,6 +228,7 @@ def get_bloomberg_sim(model, input_type='release', cross_validation=False, frequ
     elif model == 'RandomBoosting':
         strategy_component = mu.RandomBoostingComponent
     simulation_name = '%s %s%s' % (model, input_type, ' CV' if cross_validation else '')
+    position_component = pu.SimpleLongShort if long_short else pu.SimpleLongOnly
     if cross_validation:
         params = dict(cross_validation=True,
                       cross_validation_params=[{}] + [{'span': x} for x in np.arange(1, 27)],
@@ -237,12 +238,12 @@ def get_bloomberg_sim(model, input_type='release', cross_validation=False, frequ
     sim = EconSim(assets=['SPX Index'], asset_data_loader=bloomberg.load_bloomberg_index_prices,
                   start_date=dt(2000, 1, 1), end_date=dt(2017, 6, 1), sample_date=dt(2017, 6, 1), data_frequency=frequency,
                   forecast_horizon=1, inputs=econ, input_data_loader=input_data_loader,
-                  strategy_component=strategy_component, simple_returns=False, position_component=pu.SimpleLongOnly,
+                  strategy_component=strategy_component, simple_returns=False, position_component=position_component,
                   simulation_name=simulation_name, data_transform_func=mu.pandas_weeks_ewma, **params)
     return sim
 
 
-def get_fred_sim(model, input_type='release', cross_validation=False, frequency='M'):
+def get_fred_sim(model, input_type='release', cross_validation=False, frequency='M', long_short=False):
     econ = fred.get_fred_us_econ_list()
     if input_type == 'release':
         input_data_loader = fred.fred_release_loader
@@ -259,6 +260,7 @@ def get_fred_sim(model, input_type='release', cross_validation=False, frequency=
     elif model == 'RandomBoosting':
         strategy_component = mu.RandomBoostingComponent
     simulation_name = '%s %s%s' % (model, input_type, ' CV' if cross_validation else '')
+    position_component = pu.SimpleLongShort if long_short else pu.SimpleLongOnly
     if cross_validation:
         params = dict(cross_validation=True,
                       cross_validation_params=[{}] + [{'span': x} for x in np.arange(1, 27)],
@@ -268,16 +270,16 @@ def get_fred_sim(model, input_type='release', cross_validation=False, frequency=
     sim = EconSim(assets=['SPX Index'], asset_data_loader=bloomberg.load_bloomberg_index_prices,
                   start_date=dt(2000, 1, 1), end_date=dt(2017, 6, 1), sample_date=dt(2017, 6, 1), data_frequency=frequency,
                   forecast_horizon=1, inputs=econ, input_data_loader=input_data_loader, strategy_component=strategy_component,
-                  simple_returns=False, position_component=pu.SimpleLongOnly, simulation_name=simulation_name,
+                  simple_returns=False, position_component=position_component, simulation_name=simulation_name,
                   data_transform_func=mu.pandas_weeks_ewma, **params)
     return sim
 
 
-def econ_run_one(model, input_type='release', cross_validation=False, oos=False, data_source='bloomberg', frequency='M'):
+def econ_run_one(model, input_type='release', cross_validation=False, oos=False, data_source='bloomberg', frequency='M', long_short=False):
     if data_source == 'bloomberg':
-        sim = get_bloomberg_sim(model, input_type, cross_validation, frequency)
+        sim = get_bloomberg_sim(model, input_type, cross_validation, frequency, long_short)
     elif data_source == 'fred':
-        sim = get_fred_sim(model, input_type, cross_validation, frequency)
+        sim = get_fred_sim(model, input_type, cross_validation, frequency, long_short)
     analytics = sim.oos_analytics if oos else sim.analytics
     strategy_returns = sim.oos_strategy_returns if oos else sim.strategy_returns
     asset_returns = sim.oos_asset_returns if oos else sim.asset_returns
@@ -290,17 +292,17 @@ def econ_run_one(model, input_type='release', cross_validation=False, oos=False,
     return acc, acc0
 
 
-def run_econ_boosting(model='Boosting', oos=False, cv=False, data_source='bloomberg', frequency='M'):
+def run_econ_boosting(model='Boosting', oos=False, cv=False, data_source='bloomberg', frequency='M', long_short=False):
     accs = []
     for input_type in ['release', 'change', 'annual change', 'revision', 'combined']:
-        acc, acc0 = econ_run_one(model, input_type, cv, oos, data_source, frequency)
+        acc, acc0 = econ_run_one(model, input_type, cv, oos, data_source, frequency, long_short)
         if len(accs) == 0:
             accs.append(acc0)
         accs.append(acc)
     return pd.concat(accs, axis=1)
 
 
-def run_one(model, input_type='release', data_source='bloomberg', frequency='M'):
+def run_one(model, input_type='release', data_source='bloomberg', frequency='M', long_short=False):
     if data_source == 'bloomberg':
         econ = bloomberg.get_bloomberg_econ_list()
         if input_type == 'release':
@@ -332,12 +334,13 @@ def run_one(model, input_type='release', data_source='bloomberg', frequency='M')
     sr = -1
     ans = None
     ans0 = None
+    position_component = pu.SimpleLongShort if long_short else pu.SimpleLongOnly
     for x in xrange(1, 27):
         simulation_name = '%s %s [%d]' % (model, input_type, x)
         sim = EconSim(assets=['SPX Index'], asset_data_loader=bloomberg.load_bloomberg_index_prices,
                       start_date=dt(2000, 1, 1), end_date=dt(2017, 6, 1), sample_date=dt(2017, 1, 1), data_frequency=frequency,
                       forecast_horizon=1, inputs=econ, input_data_loader=input_data_loader,
-                      strategy_component=strategy_component, simple_returns=False, position_component=pu.SimpleLongOnly,
+                      strategy_component=strategy_component, simple_returns=False, position_component=position_component,
                       simulation_name=simulation_name, data_transform_func=mu.pandas_weeks_ewma, default_params={'span': x})
         analytics = sim.analytics
         asset_returns = sim.asset_returns
@@ -356,10 +359,10 @@ def run_one(model, input_type='release', data_source='bloomberg', frequency='M')
     return ans, ans0
 
 
-def run_boosting(model='Boosting', data_source='bloomberg', frequency='M'):
+def run_boosting(model='Boosting', data_source='bloomberg', frequency='M', long_short=False):
     accs = []
     for input_type in ['release', 'change', 'annual change', 'revision', 'combined']:
-        acc, acc0 = run_one(model, input_type, data_source, frequency)
+        acc, acc0 = run_one(model, input_type, data_source, frequency, long_short)
         if len(accs) == 0:
             accs.append(acc0)
         accs.append(acc)
