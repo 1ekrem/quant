@@ -35,16 +35,25 @@ def remove_outliers(data, z=10, lookback=10, min_periods=5):
     return ans
 
 
-def ts_interpolate(ts):
-    data = []
-    idx = []
-    for i in range(1, len(ts)):
-        if ts.ix[i] * ts.ix[i-1] < 0:
-            idx.append(ts.index[i-1] + 0.5 * (ts.index[i] - ts.index[i-1]))
-            data.append(0.)
-    if len(data)>0:
-        ts = pd.concat([ts, pd.Series(data, index=idx)], axis=0).sort_index()
-    return ts
+def ts_interpolate(series):
+    '''
+    Create a zero observation when timeseries crosses the time axis
+    '''
+    assert isinstance(series, pd.Series)
+    data = series.dropna()
+    a = data.abs()
+    df = np.diff(data.index.values)
+    s = a.rolling(2).sum()
+    s[s<=0.] = np.nan
+    fr = a.values[:-1] / s.values[1:]
+    fr[np.isnan(fr)] = .5
+    check = data.values[:-1] * data.values[1:]
+    idx = fr * df + data.index.values[:-1]
+    idx = idx[check < 0]
+    if len(idx) > 0:
+        new_series = pd.Series([0.] * len(idx), index=idx, name=series.name)
+        data = pd.concat([data, new_series], axis=0).sort_index()
+    return data
 
 
 def store_timeseries(ts, database_name, table_name, data_name=None):

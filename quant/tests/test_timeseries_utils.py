@@ -18,6 +18,10 @@ TONE = pd.DataFrame(np.ones((5, 2)))
 TPARAMS = pd.DataFrame([[1., 3., 2.]] * 2, columns=['mean', 'median', 'std'])
 TTWO = TONE.copy()
 TTWO.iloc[:, 1] = np.nan
+ia = pd.Series([1., np.nan, 1.], index=[dt(2010, 1, 1), dt(2010, 1, 2), dt(2010, 1, 3)])
+iax = pd.Series([1., 1.], index=[dt(2010, 1, 1), dt(2010, 1, 3)])
+ib = pd.Series([-1., 2.], index=[dt(2010, 1, 1), dt(2010, 1, 4)])
+ibx = pd.Series([-1., 0., 2.], index=[dt(2010, 1, 1), dt(2010, 1, 2), dt(2010, 1, 4)])
 
 
 class TestResample(unittest.TestCase):
@@ -42,6 +46,18 @@ class TestGetDistributionScores(unittest.TestCase):
 
     def testDealWithNans(self):
         self.assertTrue((.5 * TTWO).equals(tu.get_distribution_scores(TTWO, TPARAMS)))
+
+
+class TestTsInterpolate(unittest.TestCase):
+    
+    def testRaiseAssertError(self):
+        self.assertRaises(AssertionError, tu.ts_interpolate, b)
+   
+    def testDropna(self):
+        self.assertTrue(iax.equals(tu.ts_interpolate(ia)))
+
+    def testCalculation(self):
+        self.assertTrue(ibx.equals(tu.ts_interpolate(ib)))
 
 
 if __name__ == "__main__":

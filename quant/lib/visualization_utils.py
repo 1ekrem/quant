@@ -5,7 +5,9 @@ Created on 28 Jun 2017
 '''
 import numpy as np
 import pandas as pd
+from datetime import datetime as dt
 from matplotlib import pyplot as plt
+from quant.lib import timeseries_utils as tu
 from quant.lib.main_utils import logger
 
 COLORMAP = ['#1E90FF', '#FEEB00', '#FFC214', '#9CCD71', '#1AB55A', '#FF7076', '#FF4853', '#9595E4']
@@ -55,9 +57,25 @@ def bin_plot(x, y, bins=20, diag_line=False):
         logger.warn('Not enough data for bin plot')
 
 
-def axis_area_plot(ts, title=None, color=COLORMAP[0]):
-    ts = tu.ts_interpolate(ts)
-    plt.fill_between(ts[ts>=0].index, np.zeros(len(ts[ts>=0])), ts[ts>=0].values, color=color)
-    plt.fill_between(ts[ts<=0].index, np.zeros(len(ts[ts<=0])), ts[ts<=0].values, color=color)
-    if title is not None:
-        plt.title(title, weight='bold')
+def axis_area_plot(ts, color=COLORMAP[0]):
+    if isinstance(ts, pd.DataFrame):
+        data = ts.iloc[:, 0]
+    else:
+        data = ts
+    data = tu.ts_interpolate(data)
+    plt.fill_between(data[data>=0].index, np.zeros(len(data[data>=0])), data[data>=0].values, color=color, alpha=0.5)
+    plt.fill_between(data[data<=0].index, np.zeros(len(data[data<=0])), data[data<=0].values, color=color, alpha=0.5)
+    data.plot(lw=2, color=color)
+
+
+def use_monthly_ticks(data):
+    idx = data.resample('B').last().index
+    idx = [idx[i + 1] for i in xrange(len(idx)-1) if idx[i].month != idx[i+1].month]
+    if len(idx) > 0:
+        txt = [dt.strftime(x, '%b\n%Y') if x.month==1 else dt.strftime(x, '%b') for x in idx]
+        plt.xticks(idx, txt, rotation=0, ha='center')
+
+
+def highlight_last_observation(data, color='green'):
+    s = data if isinstance(data, pd.Series) else data.iloc[:, 0]
+    plt.plot([data.index[-1]], [data.values[-1]], marker='s', color=color)

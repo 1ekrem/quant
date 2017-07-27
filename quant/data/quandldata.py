@@ -5,6 +5,7 @@ Created on 25 Jul 2017
 '''
 QUANDL_KEY = "uwzfxL-Kxg5sMVfVuHSW"
 
+import pandas as pd
 import quandl as qd
 from quant.lib import data_utils as du, timeseries_utils as tu
 from quant.lib.main_utils import logger
@@ -50,6 +51,25 @@ def download_and_store_series(series_name, series_id, table_name=QUANDL_FUTURES)
         tu.store_timeseries(series, DATABASE_NAME, table_name, series_name)
         
 
+def get_quandl_series(series_name, start_date=None, end_date=None):
+    ans = tu.get_timeseries(DATABASE_NAME, QUANDL_FUTURES, index_range=(start_date, end_date),
+                            column_list=['Settle'], data_name=series_name)
+    if ans is not None:
+        ans = ans.iloc[:, 0]
+        ans.name = series_name
+        return ans
+    else:
+        return None
+
+
+def quandl_price_loader(series, start_date=None, end_date=None):
+    ans = []
+    for series_name in series:
+        data = get_quandl_series(series_name, start_date, end_date)
+        if data is not None:
+            ans.append(data)
+    return pd.concat(ans, axis=1) if len(ans)>0 else None
+    
 # Main function
 def download_all_series():
     for series_name, series_id in FUTURES.iteritems():
