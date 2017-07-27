@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from datetime import datetime as dt
 from quant.data import fred, bloomberg
-from quant.lib import timeseries_utils as tu, data_utils as du, machine_learning_utils as mu, portfolio_utils as pu
+from quant.lib import timeseries_utils as tu, machine_learning_utils as mu, portfolio_utils as pu
 from quant.research import machine_learning as ml
 
 PATH = os.path.expanduser('~/TempWork/models/')

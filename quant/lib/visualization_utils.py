@@ -54,3 +54,10 @@ def bin_plot(x, y, bins=20, diag_line=False):
     else:
         logger.warn('Not enough data for bin plot')
 
+
+def axis_area_plot(ts, title=None, color=COLORMAP[0]):
+    ts = tu.ts_interpolate(ts)
+    plt.fill_between(ts[ts>=0].index, np.zeros(len(ts[ts>=0])), ts[ts>=0].values, color=color)
+    plt.fill_between(ts[ts<=0].index, np.zeros(len(ts[ts<=0])), ts[ts<=0].values, color=color)
+    if title is not None:
+        plt.title(title, weight='bold')

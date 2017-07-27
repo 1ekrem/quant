@@ -151,6 +151,7 @@ def execute_sql_input_script(database_name, scripts):
             db.close()
             return None
         except Exception as e:
+            db.close()
             return e
 
 
@@ -164,6 +165,7 @@ def execute_sql_output_script(database_name, scripts):
             db.close()
             return True, data
         except Exception as e:
+            db.close()
             return False, e
 
 

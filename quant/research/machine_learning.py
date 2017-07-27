@@ -143,6 +143,7 @@ class EconSim(object):
         return '%s/%s.model' % (self.model_path, self.simulation_name)
 
     def load_existing_model(self, in_sample, out_of_sample):
+        logger.info('Loading model %s' % self.simulation_name)
         filename = self.get_model_filename()
         model = None
         if os.path.isfile(filename):
@@ -234,7 +235,7 @@ def get_bloomberg_sim(model, input_type='release', cross_validation=False):
     else:
         params = {}
     sim = EconSim(assets=['SPX Index'], asset_data_loader=bloomberg.load_bloomberg_index_prices,
-                  start_date=dt(2000, 1, 1), end_date=dt(2017, 6, 1), sample_date=dt(2017, 6, 1), data_frequency='M',
+                  start_date=dt(2000, 1, 1), end_date=dt(2017, 6, 1), sample_date=dt(2017, 6, 1), data_frequency='2',
                   forecast_horizon=1, inputs=econ, input_data_loader=input_data_loader,
                   strategy_component=strategy_component, simple_returns=False, position_component=pu.SimpleLongOnly,
                   simulation_name=simulation_name, data_transform_func=mu.pandas_weeks_ewma, **params)
@@ -265,7 +266,7 @@ def get_fred_sim(model, input_type='release', cross_validation=False):
     else:
         params = {}
     sim = EconSim(assets=['SPX Index'], asset_data_loader=bloomberg.load_bloomberg_index_prices,
-                  start_date=dt(2000, 1, 1), end_date=dt(2017, 6, 1), sample_date=dt(2017, 6, 1), data_frequency='M',
+                  start_date=dt(2000, 1, 1), end_date=dt(2017, 6, 1), sample_date=dt(2017, 6, 1), data_frequency='2',
                   forecast_horizon=1, inputs=econ, input_data_loader=input_data_loader, strategy_component=strategy_component,
                   simple_returns=False, position_component=pu.SimpleLongOnly, simulation_name=simulation_name,
                   data_transform_func=mu.pandas_weeks_ewma, **params)
