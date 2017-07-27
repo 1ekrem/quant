@@ -35,6 +35,18 @@ def remove_outliers(data, z=10, lookback=10, min_periods=5):
     return ans
 
 
+def ts_interpolate(ts):
+    data = []
+    idx = []
+    for i in range(1, len(ts)):
+        if ts.ix[i] * ts.ix[i-1] < 0:
+            idx.append(ts.index[i-1] + 0.5 * (ts.index[i] - ts.index[i-1]))
+            data.append(0.)
+    if len(data)>0:
+        ts = pd.concat([ts, pd.Series(data, index=idx)], axis=0).sort_index()
+    return ts
+
+
 def store_timeseries(ts, database_name, table_name, data_name=None):
     du.pandas_bulk_insert(ts, database_name, table_name, du.TIMESERIES_COLUMN_NAME, du.TIMESERIES_INDEX_NAME,
                           du.TIMESERIES_VALUE_NAME, data_name, du.TIMESERIES_DATA_NAME)
