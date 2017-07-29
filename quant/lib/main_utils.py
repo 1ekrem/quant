@@ -8,3 +8,5 @@ import logging
 logging.basicConfig(format='%(asctime)s %(message)s')
 logger = logging.getLogger('quant')
 logger.setLevel(20)
+
+MODEL_PATH = '/home/wayne/TempWork/models'
