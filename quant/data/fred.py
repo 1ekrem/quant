@@ -71,6 +71,11 @@ CHINA_ECON = [# Economic indicator
               # Risk indicators
               'VXFXICLS', 'CHIEPUINDXM', 'CHNRECM',
               ]
+UK_ECON = [# Economic indicators
+           'CLVMNACSCAB1GQUK', 'GBRCPIALLMINMEI', 'LMUNRRTTGBM156N', 'GBRRECDM', 'LORSGPORGBQ659S', 'CPALTT01GBM657N',
+           # Real estate
+           'QGBN628BIS', 'QGBR368BIS',
+          ]
 US_SERIES = [# Stock
              'SP500', 'NASDAQCOM', 'DJIA', 'VIXCLS',
              # FX
@@ -327,7 +332,7 @@ def cache_series_release_data(series_name):
 
 
 def download_all_releases():
-    for series_name in US_ECON + CHINA_ECON + EU_ECON:
+    for series_name in US_ECON + CHINA_ECON + EU_ECON + UK_ECON:
         download_and_store_series_all_releases(series_name)
         cache_series_release_data(series_name)
 
