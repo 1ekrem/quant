@@ -3,7 +3,6 @@ Created on 26 Jul 2017
 
 @author: wayne
 '''
-import os
 import numpy as np
 from datetime import datetime as dt
 from quant.data import fred, quandldata
