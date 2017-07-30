@@ -285,10 +285,16 @@ def econ_run_one(model, input_type='release', cross_validation=False, oos=False,
     strategy_returns = sim.oos_strategy_returns if oos else sim.strategy_returns
     asset_returns = sim.oos_asset_returns if oos else sim.asset_returns
     a = analytics['SPX Index'].iloc[1, :]
-    acc = (1. + strategy_returns.iloc[:, 0]).cumprod() - 1.
+    if simple_returns:
+        acc = strategy_returns.iloc[:, 0].cumsum()
+    else:
+        acc = (1. + strategy_returns.iloc[:, 0]).cumprod() - 1.
     acc.name = '%s (mean: %.1f%%, std: %.1f%%, sharpe: %.2f)' % (sim.simulation_name, 100. * a.loc['mean'], 100. * a.loc['std'], a.loc['sharpe'])
     a0 = analytics['SPX Index'].iloc[0, :]
-    acc0 = (1. + asset_returns.iloc[:, 0]).cumprod() - 1.
+    if simple_returns:
+        acc0 = asset_returns.iloc[:, 0].cumsum()
+    else:
+        acc0 = (1. + asset_returns.iloc[:, 0]).cumprod() - 1.
     acc0.name = 'SPX Index (mean: %.1f%%, std: %.1f%%, sharpe: %.2f)' % (100. * a0.loc['mean'], 100. * a0.loc['std'], a0.loc['sharpe'])
     return acc, acc0
 
@@ -350,12 +356,20 @@ def run_one(model, input_type='release', data_source='bloomberg', frequency='M',
         a0 = analytics['SPX Index'].iloc[0, :]
         a = analytics['SPX Index'].iloc[1, :]
         if ans0 is None:
-            acc = (1. + asset_returns.iloc[:, 0]).cumprod() - 1.
-            acc.name = 'SPX Index (mean: %.1f%%, std: %.1f%%, sharpe: %.2f)' % (100. * a0.loc['mean'], 100. * a0.loc['std'], a0.loc['sharpe'])
+            if simple_returns:
+                acc = asset_returns.iloc[:, 0].cumsum()
+                acc.name = 'SPX Index (mean: %.1f, std: %.1f, sharpe: %.2f)' % (a0.loc['mean'], a0.loc['std'], a0.loc['sharpe'])
+            else:
+                acc = (1. + asset_returns.iloc[:, 0]).cumprod() - 1.
+                acc.name = 'SPX Index (mean: %.1f%%, std: %.1f%%, sharpe: %.2f)' % (100. * a0.loc['mean'], 100. * a0.loc['std'], a0.loc['sharpe'])
             ans0 = acc
         if a.loc['sharpe'] > sr:
-            acc = (1. + strategy_returns.iloc[:, 0]).cumprod() - 1.
-            acc.name = '%s (mean: %.1f%%, std: %.1f%%, sharpe: %.2f)' % (sim.simulation_name, 100. * a.loc['mean'], 100. * a.loc['std'], a.loc['sharpe'])
+            if simple_returns:
+                acc = strategy_returns.iloc[:, 0].cumsum()
+                acc.name = '%s (mean: %.1f, std: %.1f, sharpe: %.2f)' % (sim.simulation_name, a.loc['mean'], a.loc['std'], a.loc['sharpe'])
+            else:
+                acc = (1. + strategy_returns.iloc[:, 0]).cumprod() - 1.
+                acc.name = '%s (mean: %.1f%%, std: %.1f%%, sharpe: %.2f)' % (sim.simulation_name, 100. * a.loc['mean'], 100. * a.loc['std'], a.loc['sharpe'])
             sr = a.loc['sharpe']
             ans = acc
     return ans, ans0
