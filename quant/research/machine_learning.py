@@ -117,11 +117,15 @@ class EconSim(object):
         seq = mu.get_cross_validation_buckets(len(in_sample), self.cross_validation_buckets)
         selection = None
         error_rate = 100.
+        total_calc = len(self.cross_validation_params) * len(self.cross_validation_buckets)
+        idx = 0
         for param in self.cross_validation_params:
             errors = []
             validation_param = self.default_params.copy()
             validation_param.update(param)
             for j in xrange(self.cross_validation_buckets):
+                idx += 1
+                logger.info('Running cross validation .. %.1f%%' % (1. * idx / total_calc))
                 bucket = seq[j]
                 validation = in_sample.iloc[bucket]
                 estimation = in_sample.loc[~in_sample.index.isin(validation.index)]
@@ -231,8 +235,8 @@ def get_bloomberg_sim(model, input_type='release', cross_validation=False, frequ
     position_component = pu.SimpleLongShort if long_short else pu.SimpleLongOnly
     if cross_validation:
         params = dict(cross_validation=True,
-                      cross_validation_params=[{}] + [{'span': x} for x in np.arange(1, 27)],
-                      cross_validation_buckets=5)
+                      cross_validation_params=[{}] + [{'span': x} for x in np.arange(1, 14)],
+                      cross_validation_buckets=5 if frequency=='M' else 10)
     else:
         params = {}
     sim = EconSim(assets=['SPX Index'], asset_data_loader=bloomberg.load_bloomberg_index_prices,
@@ -263,8 +267,8 @@ def get_fred_sim(model, input_type='release', cross_validation=False, frequency=
     position_component = pu.SimpleLongShort if long_short else pu.SimpleLongOnly
     if cross_validation:
         params = dict(cross_validation=True,
-                      cross_validation_params=[{}] + [{'span': x} for x in np.arange(1, 27)],
-                      cross_validation_buckets=5)
+                      cross_validation_params=[{}] + [{'span': x} for x in np.arange(1, 14)],
+                      cross_validation_buckets=5 if frequency=='M' else 10)
     else:
         params = {}
     sim = EconSim(assets=['SPX Index'], asset_data_loader=bloomberg.load_bloomberg_index_prices,

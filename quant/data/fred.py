@@ -72,7 +72,7 @@ CHINA_ECON = [# Economic indicator
               'VXFXICLS', 'CHIEPUINDXM', 'CHNRECM',
               ]
 UK_ECON = [# Economic indicators
-           'CLVMNACSCAB1GQUK', 'GBRCPIALLMINMEI', 'LMUNRRTTGBM156N', 'GBRRECDM', 'LORSGPORGBQ659S', 'CPALTT01GBM657N',
+           'CLVMNACSCAB1GQUK', 'GBRCPIALLMINMEI', 'LMUNRRTTGBM156N', 'LORSGPORGBQ659S', 'CPALTT01GBM657N',
            # Real estate
            'QGBN628BIS', 'QGBR368BIS',
           ]
@@ -326,6 +326,7 @@ def cache_series_release_data(series_name):
         if revision is not None:
             revision.name = series_name + '|revision'
             ans.append(revision)
+        return ans
         if len(ans)>0:
             ans = pd.concat(ans, axis=1)
             tu.store_timeseries(ans, DATABASE_NAME, CACHE_TABLE_NAME)
@@ -345,6 +346,10 @@ def download_all_series():
 # data loader
 def get_fred_us_econ_list():
     return US_ECON
+
+
+def get_fred_us_eu_econ_list():
+    return US_ECON + EU_ECON
 
 
 def get_fred_global_econ_list():

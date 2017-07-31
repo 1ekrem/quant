@@ -3,3 +3,5 @@ ipython pension.py
 wait
 ipython spx.py
 wait
+ipython eur.py
+wait
