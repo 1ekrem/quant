@@ -39,11 +39,14 @@ def get_performance_analytics(data, lookback=None, simple_returns=False):
         ans['mean'] = [np.round(x, 2) for x in ans['mean']]
         ans['std'] = [np.round(x, 2) for x in ans['std']]
         ans['sharpe'] = [np.round(x, 2) for x in ans['sharpe']]
-        
+        ans['skew'] = [np.round(x, 2) for x in ans['skew']]
+        ans['kurtosis'] = [np.round(x, 2) for x in ans['kurtosis']]
     else:
         ans['mean'] = ['%.1f%%' % (100. * x) for x in ans['mean']]
         ans['std'] = ['%.1f%%' % (100. * x) for x in ans['std']]
         ans['sharpe'] = [np.round(x, 2) for x in ans['sharpe']]
+        ans['skew'] = [np.round(x, 2) for x in ans['skew']]
+        ans['kurtosis'] = [np.round(x, 2) for x in ans['kurtosis']]
     return ans
 
 
@@ -70,7 +73,10 @@ def plot_short_returns(data, lookback, simple_returns):
     plt.subplot(223)
     rw = r.resample('W').sum()
     vu.bar_plot(rw.T, vu.get_monthly_index)
-    plt.title('Weekly Returns')
+    plt.title('Weekly Returns', weight='bold')
+    plt.subplot(224)
+    plt.hist(r['Returns'], 20)
+    plt.title('Returns Distribution', weight='bold')
     plt.tight_layout()
 
 

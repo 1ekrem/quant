@@ -45,6 +45,8 @@ US_ECON = [# Economic indicator
            'WAAA', 'WBAA', 'BAMLC0A4CBBBEY',
            # Risk indicator
            'DRSFRMACBS', 'BAMLH0A0HYM2', 'BAMLC0A4CBBB', 'BAMLH0A3HYC', 'DRCCLACBS', 'USREC', 'USARECM',
+           # QE
+           'WSHOTS', 'WSHOMCB',
            ]
 EU_ECON = [# Interest rates
            'IRLTLT01DEM156N', 'BAMLHE00EHYIEY', 'BAMLHE00EHYIOAS', 'EUR3MTD156N',
@@ -56,6 +58,8 @@ EU_ECON = [# Interest rates
            'CP0000EZ19M086NEST', 'CPALTT01OEM661N',
            # Risk indicators
            'BAMLHE00EHYITRIV', 'EUROREC', 'EUEPUINDXM',
+           # QE
+           'ECBASSETS',
            ]
 CHINA_ECON = [# Economic indicator
               'CHNCPIALLMINMEI', 'MKTGDPCNA646NWDB', 'CHNGDPNQDSMEI', 'CRDQCNAPABIS',

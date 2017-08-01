@@ -93,9 +93,17 @@ def calc_sharpe(returns):
     return calc_mean(returns) / calc_std(returns)
 
 
+def calc_skew(returns):
+    return returns.resample('W').sum().skew(axis=0)
+
+
+def calc_kurtosis(returns):
+    return returns.resample('W').sum().kurt(axis=0)
+
+
 def get_returns_analytics(returns):
-    ans =  pd.concat([calc_mean(returns), calc_std(returns), calc_sharpe(returns)], axis=1)
-    ans.columns = ['mean', 'std', 'sharpe']
+    ans =  pd.concat([calc_mean(returns), calc_std(returns), calc_sharpe(returns), calc_skew(returns), calc_kurtosis(returns)], axis=1)
+    ans.columns = ['mean', 'std', 'sharpe', 'skew', 'kurtosis']
     return ans
 
 
