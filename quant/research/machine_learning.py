@@ -92,13 +92,10 @@ class EconSim(object):
                 ans.append(tu.resample(data, self.timeline))
         return pd.concat(ans, axis=1)
 
-    def estimate_model(self, in_sample, out_of_sample, params=None, model=None):
+    def estimate_model(self, in_sample, out_of_sample, data, params=None, model=None):
         '''
         When model is passed, it will be used by the strategy component
         '''
-        if params is None:
-            params = {}
-        data = self.create_estimation_data(params)
         logger.info('Running model with %d variables' % np.size(data, 1))
         asset_returns = self._asset_returns.loc[in_sample.index]
         in_sample_data = pu.ignore_insufficient_series(data.loc[in_sample.index], len(in_sample) * self.data_missing_fail)
@@ -111,37 +108,41 @@ class EconSim(object):
                                            out_of_sample_data=out_of_sample_data, params=params, model=model)
 
     def run_without_cross_validation(self, in_sample, out_of_sample):
-        return self.estimate_model(in_sample, out_of_sample, self.default_params)
+        data = self.create_estimation_data(self.default_params)
+        return self.estimate_model(in_sample, out_of_sample, data, self.default_params)
 
     def run_cross_validation(self, in_sample, out_of_sample):
         seq = mu.get_cross_validation_buckets(len(in_sample), self.cross_validation_buckets)
         selection = None
         error_rate = 100.
-        total_calc = len(self.cross_validation_params) * len(self.cross_validation_buckets)
+        total_calc = len(self.cross_validation_params) * self.cross_validation_buckets
         idx = 0
         for param in self.cross_validation_params:
             errors = []
             validation_param = self.default_params.copy()
             validation_param.update(param)
+            data = self.create_estimation_data(validation_param)
             for j in xrange(self.cross_validation_buckets):
                 idx += 1
-                logger.info('Running cross validation .. %.1f%%' % (1. * idx / total_calc))
+                logger.info('Running cross validation .. %.1f%%' % (100. * idx / total_calc))
                 bucket = seq[j]
                 validation = in_sample.iloc[bucket]
                 estimation = in_sample.loc[~in_sample.index.isin(validation.index)]
                 validation_returns = self._asset_returns.loc[validation.index]
-                model = self.estimate_model(estimation, validation, validation_param)
+                model = self.estimate_model(estimation, validation, data, validation_param)
                 if model is not None:
                     iteration_error = mu.StumpError(model.signal.iloc[:, 0], validation_returns.iloc[:, 0], 0.)
                     errors.append(iteration_error)
             errors = np.mean(errors)
+            logger.info('Error rate %.1f%%: %s' % (100. * errors, str(validation_param)))
             if errors < error_rate:
                 error_rate = errors
                 selection = validation_param
         if selection is None:
             return None, None, None
         else:
-            return selection, self.estimate_model(in_sample, out_of_sample, selection), error_rate
+            data = self.create_estimation_data(selection)
+            return selection, self.estimate_model(in_sample, out_of_sample, data, selection), error_rate
 
     def get_model_filename(self):
         return '%s/%s.model' % (self.model_path, self.simulation_name)
@@ -152,14 +153,17 @@ class EconSim(object):
         model = None
         if os.path.isfile(filename):
             with open(filename, 'rb') as f:
-                model = pickle.load(f)
+                selection, error_rate, model = pickle.load(f)
                 f.close()
         else:
             logger.warn('Could not find model file %s' % filename)
         if model is None:
             return None
         else:
-            return self.estimate_model(in_sample, out_of_sample, self.default_params, model)
+            self.selection = selection
+            self.error_rate = error_rate
+            data = self.create_estimation_data(selection)
+            return self.estimate_model(in_sample, out_of_sample, data, selection, model)
 
     def run_simulation_sequence(self):
         in_sample = self.timeline.copy()
@@ -187,8 +191,10 @@ class EconSim(object):
         filename = self.get_model_filename()
         if self.model is not None:
             logger.info('Exporting model')
+            selection = self.selection if hasattr(self, 'selection') else None
+            error_rate = self.error_rate if hasattr(self, 'error_rate') else None
             with open(filename, 'wb') as f:
-                pickle.dump(self.model, f)
+                pickle.dump((selection, error_rate, self.model), f)
                 f.close()
 
     def calculate_returns(self):

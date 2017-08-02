@@ -35,11 +35,11 @@ def give_me_pandas_variables(x, y):
     return myx.fillna(0.), myy.fillna(0.)
 
 
-def pandas_ewma(data, span=None):
+def pandas_ewma(data, span=None, *args, **kwargs):
     return data.ewm(span=span, ignore_na=True).mean() if span > 1. else data
 
 
-def pandas_weeks_ewma(data, span=None):
+def pandas_weeks_ewma(data, span=None, *args, **kwargs):
     df = data.index.to_series().diff().dropna().mean()
     es = 7. * span / df.days if span is not None else None
     return data.ewm(span=es, ignore_na=True).mean() if es > 1. else data 

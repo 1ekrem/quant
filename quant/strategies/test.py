@@ -25,24 +25,21 @@ def spx_data_loader(*args, **kwargs):
 
 
 def estimate_model(load_model=False):
-    simulation_name = 'SPX_FUTURE'
+    simulation_name = 'TEST'
     econ = fred.get_fred_us_econ_list()
     input_data_loader = fred.fred_combined_loader
     strategy_component = mu.RandomBoostingComponent
     position_component = pu.SimpleLongShort
-    data_transform_func = mu.pandas_weeks_ewma
-    default_params = {'forest_size': 25}
     simple_returns=True
     cross_validation=True
     cross_validation_params=[{}] + [{'span': x} for x in np.arange(1, 14)]
     cross_validation_buckets=10
     sim = ml.EconSim(start_date=START_DATE, end_date=dt.today(), sample_date=SAMLE_DATE, data_frequency=DATA_FREQUENCY,
-                     forecast_horizon=FORECAST_HORIZON, assets=['SPX Index'], asset_data_loader=spx_data_loader,
+                     forecast_horizon=2, assets=['SPX Index'], asset_data_loader=spx_data_loader,
                      inputs=econ, input_data_loader=input_data_loader, strategy_component=strategy_component,
                      position_component=position_component, simulation_name=simulation_name, model_path=MODEL_PATH,
                      load_model=load_model, simple_returns=simple_returns, cross_validation=cross_validation,
-                     cross_validation_params=cross_validation_params, cross_validation_buckets=cross_validation_buckets,
-                     data_transform_func=data_transform_func, default_params=default_params)
+                     cross_validation_params=cross_validation_params, cross_validation_buckets=cross_validation_buckets)
     return sim
 
 

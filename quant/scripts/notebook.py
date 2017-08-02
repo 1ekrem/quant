@@ -116,3 +116,14 @@ def plot_signals(data, lookback):
     pos.iloc[:, 0].plot()
     plt.title('Positions', weight='bold')
     plt.tight_layout()
+
+
+def plot_signal_forecasting_power(data, lookback, bins):
+    sig = data['signal']
+    cr = tu.resample(data['returns']['Asset Returns'].cumsum(), sig).diff()
+    vu.bin_plot(sig.iloc[-lookback:].shift(), cr.iloc[-lookback:], bins)
+    plt.axvline(sig.iloc[-1, 0], ls='--')
+    plt.xlabel('Signal')
+    plt.ylabel('Forward asset returns')
+    plt.title('Signal Forecasting Relationship', weight='bold')
+    
