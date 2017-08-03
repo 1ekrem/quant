@@ -15,7 +15,7 @@ STRATEGY_TABLE = 'strategies'
 START_DATE = dt(2000, 1, 1)
 SAMLE_DATE = dt(2017, 1, 1)
 DATA_FREQUENCY = '2'
-FORECAST_HORIZON = 1
+FORECAST_HORIZON = 2
 
 
 def eur_data_loader(*args, **kwargs):
@@ -30,6 +30,8 @@ def estimate_model(load_model=False):
     input_data_loader = fred.fred_combined_loader
     strategy_component = mu.RandomBoostingComponent
     position_component = pu.SimpleLongShort
+    data_transform_func = mu.pandas_weeks_ewma
+    default_params = None
     simple_returns=True
     cross_validation=True
     cross_validation_params=[{}] + [{'span': x} for x in np.arange(1, 14)]
@@ -39,7 +41,8 @@ def estimate_model(load_model=False):
                      inputs=econ, input_data_loader=input_data_loader, strategy_component=strategy_component,
                      position_component=position_component, simulation_name=simulation_name, model_path=MODEL_PATH,
                      load_model=load_model, simple_returns=simple_returns, cross_validation=cross_validation,
-                     cross_validation_params=cross_validation_params, cross_validation_buckets=cross_validation_buckets)
+                     cross_validation_params=cross_validation_params, cross_validation_buckets=cross_validation_buckets,
+                     data_transform_func=data_transform_func, default_params=default_params)
     return sim
 
 

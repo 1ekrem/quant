@@ -10,7 +10,6 @@ from quant.data import fred, bloomberg
 from quant.lib import timeseries_utils as tu, machine_learning_utils as mu, portfolio_utils as pu
 from quant.research import machine_learning as ml
 from quant.lib.main_utils import MODEL_PATH
-from pandas.core.config_init import default
 
 DATABASE_NAME = 'quant'
 STRATEGY_TABLE = 'strategies'

@@ -7,13 +7,14 @@ import numpy as np
 from datetime import datetime as dt
 from matplotlib import pyplot as plt
 from quant.lib import timeseries_utils as tu, portfolio_utils as pu, visualization_utils as vu
+from quant.lib.main_utils import MODEL_PATH, load_pickle
 
 DATABASE_NAME = 'quant'
 STRATEGY_TABLE = 'strategies'
 
 
-def print_now():
-    print('Information updated at %s' % dt.today().strftime('%b %d, %Y'))
+def get_now():
+    return dt.today().strftime('%b %d, %Y')
 
 
 def get_strategy_data(strategy_name):
@@ -126,4 +127,13 @@ def plot_signal_forecasting_power(data, lookback, bins):
     plt.xlabel('Signal')
     plt.ylabel('Forward asset returns')
     plt.title('Signal Forecasting Relationship', weight='bold')
-    
+
+
+def load_model_specification(simulation_name):
+    filename = MODEL_PATH + '/' + simulation_name + '.model'
+    load_data = load_pickle(filename)
+    if load_data is None:
+        return None
+    else:
+        selection, error_rate, _ = load_data
+        return selection, error_rate

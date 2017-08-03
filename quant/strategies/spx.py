@@ -15,7 +15,7 @@ STRATEGY_TABLE = 'strategies'
 START_DATE = dt(2000, 1, 1)
 SAMLE_DATE = dt(2017, 1, 1)
 DATA_FREQUENCY = '2'
-FORECAST_HORIZON = 1
+FORECAST_HORIZON = 2
 
 
 def spx_data_loader(*args, **kwargs):
@@ -31,7 +31,7 @@ def estimate_model(load_model=False):
     strategy_component = mu.RandomBoostingComponent
     position_component = pu.SimpleLongShort
     data_transform_func = mu.pandas_weeks_ewma
-    default_params = {'forest_size': 25}
+    default_params = None
     simple_returns=True
     cross_validation=True
     cross_validation_params=[{}] + [{'span': x} for x in np.arange(1, 14)]

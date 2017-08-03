@@ -3,15 +3,13 @@ Created on 22 Jun 2017
 
 @author: wayne
 '''
-import os
-import cPickle as pickle
 import numpy as np
 import pandas as pd
 from datetime import datetime as dt
-from quant.data import bloomberg, fred, quandldata
+from quant.data import bloomberg, fred
 from quant.lib import timeseries_utils as tu, portfolio_utils as pu, \
     machine_learning_utils as mu
-from quant.lib.main_utils import logger
+from quant.lib.main_utils import logger, load_pickle, write_pickle
 
 
 DATA_MISSING_FAIL = 0.5
@@ -142,7 +140,7 @@ class EconSim(object):
             return None, None, None
         else:
             data = self.create_estimation_data(selection)
-            return selection, self.estimate_model(in_sample, out_of_sample, data, selection), error_rate
+            return selection, error_rate, self.estimate_model(in_sample, out_of_sample, data, selection)
 
     def get_model_filename(self):
         return '%s/%s.model' % (self.model_path, self.simulation_name)
@@ -150,33 +148,26 @@ class EconSim(object):
     def load_existing_model(self, in_sample, out_of_sample):
         logger.info('Loading model %s' % self.simulation_name)
         filename = self.get_model_filename()
-        model = None
-        if os.path.isfile(filename):
-            with open(filename, 'rb') as f:
-                selection, error_rate, model = pickle.load(f)
-                f.close()
-        else:
-            logger.warn('Could not find model file %s' % filename)
-        if model is None:
+        load_data = load_pickle(filename)
+        if load_data is None:
             return None
         else:
-            self.selection = selection
-            self.error_rate = error_rate
-            data = self.create_estimation_data(selection)
-            return self.estimate_model(in_sample, out_of_sample, data, selection, model)
+            self.selection, self.error_rate, model = load_data
+            data = self.create_estimation_data(self.selection)
+            return self.estimate_model(in_sample, out_of_sample, data, self.selection, model)
 
     def run_simulation_sequence(self):
         in_sample = self.timeline.copy()
         in_sample = in_sample.loc[in_sample.index <= self.sample_date]
         out_of_sample = self.timeline.copy()
+        self.selection = None
+        self.error_rate = None
         if self.load_model:
             comp = self.load_existing_model(in_sample, out_of_sample)
         elif self.cross_validation:
-            selection, comp, error_rate = self.run_cross_validation(in_sample, out_of_sample)
-            if selection is not None:
-                logger.info('Error rate %.1f%% at %s' % (100. * error_rate, str(selection)))
-                self.selection = selection
-                self.error_rate = error_rate
+            self.selection, self.error_rate, comp = self.run_cross_validation(in_sample, out_of_sample)
+            if self.error_rate is not None:
+                logger.info('Error rate %.1f%% at %s' % (100. * self.error_rate, str(self.selection)))
         else:
             comp = self.run_without_cross_validation(in_sample, out_of_sample)
         if comp is None:
@@ -191,17 +182,14 @@ class EconSim(object):
         filename = self.get_model_filename()
         if self.model is not None:
             logger.info('Exporting model')
-            selection = self.selection if hasattr(self, 'selection') else None
-            error_rate = self.error_rate if hasattr(self, 'error_rate') else None
-            with open(filename, 'wb') as f:
-                pickle.dump((selection, error_rate, self.model), f)
-                f.close()
+            data = self.selection, self.error_rate, self.model
+            write_pickle(data, filename)
 
     def calculate_returns(self):
         logger.info('Simulating strategy returns')
         p = self.asset_prices.resample('B').last().ffill()
         self.asset_returns = p.diff() if self.simple_returns else p.diff() / p.shift()
-        positions = self.position_component(**{'signal': self.signal, 'normalized_signal': self.normalized_signal})
+        positions = self.position_component(**{'signal': self.signal.rolling(self.forecast_horizon).mean() if self.forecast_horizon > 1 else self.signal, 'normalized_signal': self.normalized_signal})
         self.positions = tu.resample(positions, self.asset_returns).fillna(0.).shift()
         start_date = self.start_date if self.start_date > self.positions.first_valid_index() else self.positions.first_valid_index()
         self.strategy_returns = self.positions.shift() * self.asset_returns
