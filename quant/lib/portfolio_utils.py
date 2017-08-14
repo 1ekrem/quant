@@ -40,7 +40,7 @@ def get_timeline(start_date, end_date, frequency, sample_window=None):
         base = base.resample('B').last()
     else:
         base = base.resample(frequency).last()
-    if frequency in ['1', '2data', '3', '4', '5']:
+    if frequency in ['1', '2', '3', '4', '5']:
         base = base.loc[base.index.weekday.isin([np.int(frequency) - 1])]
     if frequency == 'B' and sample_window is not None:
         n = np.sum(base.index < start_date)

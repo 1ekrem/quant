@@ -22,12 +22,13 @@ class EconSim(object):
     '''
     def __init__(self, start_date, end_date, sample_date, data_frequency, forecast_horizon, assets,
                  asset_data_loader, inputs, input_data_loader, strategy_component, position_component,
-                 simulation_name, model_path='', load_model=False, data_transform_func=None,
+                 simulation_name, model_path='', load_model=False, signal_model=False, data_transform_func=None,
                  default_params=None, data_missing_fail=DATA_MISSING_FAIL, simple_returns=False,
                  cross_validation=False, cross_validation_params=None, cross_validation_buckets=5):
         self.simulation_name = simulation_name
         self.model_path = model_path
         self.load_model = load_model
+        self.signal_model = signal_model
         self.assets = assets
         self.asset_data_loader = asset_data_loader
         self.inputs = inputs
@@ -64,14 +65,18 @@ class EconSim(object):
         self._load_start = self.timeline.index[0]
         self._load_end = self.timeline.index[-1]
 
+    def get_asset_returns(self, lookback, *args, **kwargs):
+        p = tu.resample(self.asset_prices, self.timeline)
+        if self.simple_returns:
+            asset_returns = p.diff(lookback)
+        else:
+            asset_returns = p.diff(lookback) / p.shift(lookback)
+        return asset_returns
+
     def load_asset_prices(self):
         logger.info('Loading asset prices')
         self.asset_prices = self.asset_data_loader(self.assets, start_date=self._load_start, end_date=self._load_end)
-        p = tu.resample(self.asset_prices, self.timeline)
-        if self.simple_returns:
-            asset_returns = p.diff(self.forecast_horizon)
-        else:
-            asset_returns = p.diff(self.forecast_horizon) / p.shift(self.forecast_horizon)
+        asset_returns = self.get_asset_returns(self.forecast_horizon)
         self._asset_returns = asset_returns.shift(-self.forecast_horizon)
 
     def load_input_data(self):
@@ -87,7 +92,14 @@ class EconSim(object):
             if data is not None:
                 if self.data_transform_func is not None:
                     data = self.data_transform_func(data, **param)
-                ans.append(tu.resample(data, self.timeline))
+                input = tu.resample(data, self.timeline)
+                ans.append(input)
+                if self.signal_model:
+                    asset_returns = self.get_asset_returns(**param)
+                    for c in asset_returns.columns:
+                        hisrtn = np.sign(input) * asset_returns[c] 
+                        hisrtn.name = c + ticker
+                        ans.append(hisrtn)
         return pd.concat(ans, axis=1)
 
     def estimate_model(self, in_sample, out_of_sample, data, params=None, model=None):
@@ -159,6 +171,8 @@ class EconSim(object):
     def run_simulation_sequence(self):
         in_sample = self.timeline.copy()
         in_sample = in_sample.loc[in_sample.index <= self.sample_date]
+        if self.forecast_horizon > 1:
+            in_sample = in_sample.iloc[::self.forecast_horizon]
         out_of_sample = self.timeline.copy()
         self.selection = None
         self.error_rate = None
@@ -189,7 +203,7 @@ class EconSim(object):
         logger.info('Simulating strategy returns')
         p = self.asset_prices.resample('B').last().ffill()
         self.asset_returns = p.diff() if self.simple_returns else p.diff() / p.shift()
-        positions = self.position_component(**{'signal': self.signal.rolling(self.forecast_horizon).mean() if self.forecast_horizon > 1 else self.signal, 'normalized_signal': self.normalized_signal})
+        positions = self.position_component(**{'signal': self.signal, 'normalized_signal': self.normalized_signal})
         self.positions = tu.resample(positions, self.asset_returns).fillna(0.).shift()
         start_date = self.start_date if self.start_date > self.positions.first_valid_index() else self.positions.first_valid_index()
         self.strategy_returns = self.positions.shift() * self.asset_returns

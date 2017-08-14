@@ -15,7 +15,7 @@ STRATEGY_TABLE = 'strategies'
 START_DATE = dt(2000, 1, 1)
 SAMLE_DATE = dt(2017, 1, 1)
 DATA_FREQUENCY = '2'
-FORECAST_HORIZON = 2
+FORECAST_HORIZON = 1
 
 
 def eur_data_loader(*args, **kwargs):

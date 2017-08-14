@@ -14,19 +14,19 @@ DATABASE_NAME = 'quant'
 STRATEGY_TABLE = 'strategies'
 START_DATE = dt(2000, 1, 1)
 SAMLE_DATE = dt(2017, 1, 1)
-DATA_FREQUENCY = '2'
+DATA_FREQUENCY = 'M'
 FORECAST_HORIZON = 1
 
 
-def spx_data_loader(*args, **kwargs):
-    ans = tu.get_timeseries(DATABASE_NAME, quandldata.QUANDL_FUTURES, column_list=['settle'], data_name='S&P 500')
-    ans.columns = ['SPX Index']
+def eur_data_loader(*args, **kwargs):
+    ans = tu.get_timeseries(DATABASE_NAME, quandldata.QUANDL_FUTURES, column_list=['settle'], data_name='EUR/USD')
+    ans.columns = ['EUR/USD']
     return ans
 
 
 def estimate_model(load_model=False):
-    simulation_name = 'SPX_FUTURE'
-    econ = fred.get_fred_us_econ_list()
+    simulation_name = 'EURUSD'
+    econ = fred.get_fred_us_eu_econ_list()
     input_data_loader = fred.fred_combined_loader
     strategy_component = mu.RandomBoostingComponent
     position_component = pu.SimpleLongShort
@@ -35,9 +35,9 @@ def estimate_model(load_model=False):
     simple_returns=True
     cross_validation=True
     cross_validation_params=[{}] + [{'span': x} for x in np.arange(1, 14)]
-    cross_validation_buckets=10
+    cross_validation_buckets=5
     sim = ml.EconSim(start_date=START_DATE, end_date=dt.today(), sample_date=SAMLE_DATE, data_frequency=DATA_FREQUENCY,
-                     forecast_horizon=FORECAST_HORIZON, assets=['SPX Index'], asset_data_loader=spx_data_loader,
+                     forecast_horizon=FORECAST_HORIZON, assets=['EUR/USD'], asset_data_loader=eur_data_loader,
                      inputs=econ, input_data_loader=input_data_loader, strategy_component=strategy_component,
                      position_component=position_component, simulation_name=simulation_name, model_path=MODEL_PATH,
                      load_model=load_model, simple_returns=simple_returns, cross_validation=cross_validation,
