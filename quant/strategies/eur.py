@@ -25,10 +25,10 @@ def eur_signal_loader(*args, **kwargs):
 
 
 def estimate_model():
-    simulation_name = 'SPX_FUTURE'
+    simulation_name = 'EUR_FUTURE'
     signal_loader = eur_signal_loader
     sim = pu.TradingSim(start_date=START_DATE, end_date=dt.today(), data_frequency=DATA_FREQUENCY,
-                        assets=['SPX Index'], asset_data_loader=eur_data_loader,
+                        assets=['EUR/USD'], asset_data_loader=eur_data_loader,
                         signal_loader=signal_loader, simulation_name=simulation_name)
     return sim
 
