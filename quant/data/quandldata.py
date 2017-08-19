@@ -16,6 +16,7 @@ QUANDL_FUTURES = 'quandl_futures'
 FUTURES = {'S&P 500': 'CHRIS/CME_SP1',
            'S&P 500 Emini': 'CHRIS/CME_ES1',
            'NASDAQ 200 Emini': 'CHRIS/CME_NQ1',
+           'Eurostoxx 50': 'CHRIS/EUREX_FESX1',
            'US Treasury': 'CHRIS/CME_US1',
            'Crude Oil': 'CHRIS/CME_CL1',
            'Eurodollar': 'CHRIS/CME_ED1',

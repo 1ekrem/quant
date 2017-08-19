@@ -3,19 +3,16 @@ Created on 26 Jul 2017
 
 @author: wayne
 '''
-import numpy as np
 from datetime import datetime as dt
-from quant.data import fred, quandldata
-from quant.lib import timeseries_utils as tu, machine_learning_utils as mu, portfolio_utils as pu
-from quant.research import machine_learning as ml
-from quant.lib.main_utils import MODEL_PATH
+from quant.data import quandldata
+from quant.lib import timeseries_utils as tu, portfolio_utils as pu
+
 
 DATABASE_NAME = 'quant'
 STRATEGY_TABLE = 'strategies'
 START_DATE = dt(2000, 1, 1)
 SAMLE_DATE = dt(2017, 1, 1)
-DATA_FREQUENCY = '2'
-FORECAST_HORIZON = 1
+DATA_FREQUENCY = 'B'
 
 
 def spx_data_loader(*args, **kwargs):
@@ -24,31 +21,17 @@ def spx_data_loader(*args, **kwargs):
     return ans
 
 
-def estimate_model(load_model=False):
+def spx_signal_loader(*args, **kwargs):
+    return tu.get_timeseries(DATABASE_NAME, STRATEGY_TABLE, column_list=['Signal'], data_name='PENSION_SPX')
+
+
+def estimate_model():
     simulation_name = 'SPX_FUTURE'
-    econ = fred.get_fred_us_econ_list()
-    input_data_loader = fred.fred_combined_loader
-    strategy_component = mu.RandomBoostingComponent
-    position_component = pu.SimpleLongShort
-    data_transform_func = mu.pandas_weeks_ewma
-    default_params = None
-    simple_returns=True
-    cross_validation=True
-    cross_validation_params=[{}] + [{'span': x} for x in np.arange(1, 14)]
-    cross_validation_buckets=10
-    sim = ml.EconSim(start_date=START_DATE, end_date=dt.today(), sample_date=SAMLE_DATE, data_frequency=DATA_FREQUENCY,
-                     forecast_horizon=FORECAST_HORIZON, assets=['SPX Index'], asset_data_loader=spx_data_loader,
-                     inputs=econ, input_data_loader=input_data_loader, strategy_component=strategy_component,
-                     position_component=position_component, simulation_name=simulation_name, model_path=MODEL_PATH,
-                     load_model=load_model, simple_returns=simple_returns, cross_validation=cross_validation,
-                     cross_validation_params=cross_validation_params, cross_validation_buckets=cross_validation_buckets,
-                     data_transform_func=data_transform_func, default_params=default_params)
+    signal_loader = spx_signal_loader
+    sim = pu.TradingSim(start_date=START_DATE, end_date=dt.today(), data_frequency=DATA_FREQUENCY,
+                        assets=['SPX Index'], asset_data_loader=spx_data_loader,
+                        signal_loader=signal_loader, simulation_name=simulation_name)
     return sim
-
-
-def create_model():
-    sim = estimate_model()
-    sim.pickle_model()
 
 
 def export_model_data(sim):
@@ -57,23 +40,23 @@ def export_model_data(sim):
     data.columns = ['Signal']
     tu.store_timeseries(data, DATABASE_NAME, STRATEGY_TABLE, data_name)
     data = sim.positions.copy()
-    data.columns = ['Positions']
+    data.columns = [x + ' Positions' for x in data.columns]
     tu.store_timeseries(data, DATABASE_NAME, STRATEGY_TABLE, data_name)
     data = sim.strategy_returns.copy()
-    data.columns = ['Returns']
+    data.columns = [x + ' Returns' for x in data.columns]
     tu.store_timeseries(data, DATABASE_NAME, STRATEGY_TABLE, data_name)
     data = sim.asset_returns.copy()
     data.columns = ['Asset Returns']
     tu.store_timeseries(data, DATABASE_NAME, STRATEGY_TABLE, data_name)
 
 
-def update_pension_model():
-    sim = estimate_model(True)
+def update_model():
+    sim = estimate_model()
     export_model_data(sim)
 
 
 def main():
-    update_pension_model()
+    update_model()
 
 
 if __name__ == '__main__':

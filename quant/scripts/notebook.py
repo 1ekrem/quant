@@ -4,6 +4,7 @@ Created on 27 Jul 2017
 @author: wayne
 '''
 import numpy as np
+import pandas as pd
 from datetime import datetime as dt
 from matplotlib import pyplot as plt
 from quant.lib import timeseries_utils as tu, portfolio_utils as pu, visualization_utils as vu
@@ -20,6 +21,13 @@ def get_now():
 def get_strategy_data(strategy_name):
     returns = tu.get_timeseries(DATABASE_NAME, STRATEGY_TABLE, column_list=['Asset Returns', 'Returns'], data_name=strategy_name)
     positions = tu.get_timeseries(DATABASE_NAME, STRATEGY_TABLE, column_list=['Positions'], data_name=strategy_name)
+    signal = tu.get_timeseries(DATABASE_NAME, STRATEGY_TABLE, column_list=['Signal'], data_name=strategy_name)
+    return dict(returns=returns, positions=positions, signal=signal)
+
+
+def get_trading_strategy_data(strategy_name):
+    returns = tu.get_timeseries(DATABASE_NAME, STRATEGY_TABLE, column_list=['Asset Returns', 'Original Returns', 'Reversal Returns'], data_name=strategy_name)
+    positions = tu.get_timeseries(DATABASE_NAME, STRATEGY_TABLE, column_list=['Original Positions', 'Reversal Positions'], data_name=strategy_name)
     signal = tu.get_timeseries(DATABASE_NAME, STRATEGY_TABLE, column_list=['Signal'], data_name=strategy_name)
     return dict(returns=returns, positions=positions, signal=signal)
 
@@ -51,22 +59,22 @@ def get_performance_analytics(data, lookback=None, simple_returns=False):
     return ans
 
 
-def plot_short_returns(data, lookback, simple_returns):
+def plot_short_returns(data, lookback, simple_returns, d1='Asset Returns', d2='Returns'):
     r = data['returns'].iloc[-lookback:]
     r3 = get_cumulative_returns(data, lookback, simple_returns)
     dd = pu.calc_drawdown(r)
     plt.figure(figsize=(12, 8))
     plt.subplot(221)
-    vu.axis_area_plot(r3['Returns'])
-    r3['Asset Returns'].plot(color='black', ls='--')
+    vu.axis_area_plot(r3[d2])
+    r3[d1].plot(color='black', ls='--')
     vu.use_monthly_ticks(r3)
     plt.legend(loc='best', frameon=False)
     plt.grid(ls='--')
     plt.title('Cumulative Returns', weight='bold')
     plt.subplot(222)
-    vu.axis_area_plot(dd['Returns'], 'orange')
-    dd['Asset Returns'].plot(color='black', ls='--')
-    vu.highlight_last_observation(dd['Returns'])
+    vu.axis_area_plot(dd[d2], 'orange')
+    dd[d1].plot(color='black', ls='--')
+    vu.highlight_last_observation(dd[d2])
     vu.use_monthly_ticks(r3)
     plt.legend(loc='best', frameon=False)
     plt.grid(ls='--')
@@ -76,26 +84,26 @@ def plot_short_returns(data, lookback, simple_returns):
     vu.bar_plot(rw.T, vu.get_monthly_index)
     plt.title('Weekly Returns', weight='bold')
     plt.subplot(224)
-    plt.hist(r['Returns'], 20)
+    plt.hist(r[d2], 20)
     plt.title('Returns Distribution', weight='bold')
     plt.tight_layout()
 
 
-def plot_long_returns(data, simple_returns):
+def plot_long_returns(data, simple_returns, d1='Returns', d2='Asset Returns'):
     r3 = get_cumulative_returns(data, simple_returns=simple_returns)
     dd = pu.calc_drawdown(data['returns'])
     plt.figure(figsize=(12, 4))
     plt.subplot(121)
-    vu.axis_area_plot(r3['Returns'])
-    r3['Asset Returns'].plot(color='black', ls='--')
+    vu.axis_area_plot(r3[d1])
+    r3[d2].plot(color='black', ls='--')
     vu.use_annual_ticks(r3)
     plt.legend(loc='best', frameon=False)
     plt.grid(ls='--')
     plt.title('Cumulative Returns', weight='bold')
     plt.subplot(122)
-    vu.axis_area_plot(dd['Returns'], 'orange')
-    dd['Asset Returns'].plot(color='black', ls='--')
-    vu.highlight_last_observation(dd['Returns'])
+    vu.axis_area_plot(dd[d1], 'orange')
+    dd[d2].plot(color='black', ls='--')
+    vu.highlight_last_observation(dd[d1])
     vu.use_annual_ticks(r3)
     plt.legend(loc='best', frameon=False)
     plt.grid(ls='--')
@@ -114,7 +122,7 @@ def plot_signals(data, lookback):
     plt.grid(ls='--')
     plt.title('Signal', weight='bold')
     plt.subplot(122)
-    pos.iloc[:, 0].plot()
+    pos.iloc[:, -1].plot()
     plt.title('Positions', weight='bold')
     plt.tight_layout()
 
@@ -127,8 +135,19 @@ def plot_signal_forecasting_power(data, lookback, bins):
     plt.xlabel('Signal')
     plt.ylabel('Forward asset returns')
     plt.title('Signal Forecasting Relationship', weight='bold')
-
-
+    
+    
+def plot_performance_autocorrelation(data, bins):
+    r = data['returns']['Asset Returns'].resample('W').sum()
+    s = tu.resample(data['signal'].iloc[:, 0], r)
+    x = np.sign(s) * r
+    x.name = 'Past'
+    y = np.sign(s) * r.shift(-1)
+    y.name = 'Future'
+    vu.bin_plot(x, y, bins)
+    plt.title('Past vs Future performance')
+    
+    
 def load_model_specification(simulation_name):
     filename = MODEL_PATH + '/' + simulation_name + '.model'
     load_data = load_pickle(filename)

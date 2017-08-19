@@ -4,8 +4,9 @@ Created on 26 Jul 2017
 @author: wayne
 '''
 from datetime import datetime as dt
-from quant.data import fred, quandldata
+from quant.data import quandldata
 from quant.lib import timeseries_utils as tu, portfolio_utils as pu
+
 
 DATABASE_NAME = 'quant'
 STRATEGY_TABLE = 'strategies'
@@ -14,21 +15,21 @@ SAMLE_DATE = dt(2017, 1, 1)
 DATA_FREQUENCY = 'B'
 
 
-def eur_data_loader(*args, **kwargs):
+def usd_data_loader(*args, **kwargs):
     ans = tu.get_timeseries(DATABASE_NAME, quandldata.QUANDL_FUTURES, column_list=['settle'], data_name='EUR/USD')
-    ans.columns = ['EUR/USD']
+    ans.columns = ['US Dollar']
     return ans
 
 
-def eur_signal_loader(*args, **kwargs):
-    return tu.get_timeseries(DATABASE_NAME, STRATEGY_TABLE, column_list=['Signal'], data_name='EURUSD')
+def usd_signal_loader(*args, **kwargs):
+    return tu.get_timeseries(DATABASE_NAME, STRATEGY_TABLE, column_list=['Signal'], data_name='USD')
 
 
 def estimate_model():
     simulation_name = 'SPX_FUTURE'
-    signal_loader = eur_signal_loader
+    signal_loader = usd_signal_loader
     sim = pu.TradingSim(start_date=START_DATE, end_date=dt.today(), data_frequency=DATA_FREQUENCY,
-                        assets=['SPX Index'], asset_data_loader=eur_data_loader,
+                        assets=['SPX Index'], asset_data_loader=usd_data_loader,
                         signal_loader=signal_loader, simulation_name=simulation_name)
     return sim
 
@@ -49,13 +50,13 @@ def export_model_data(sim):
     tu.store_timeseries(data, DATABASE_NAME, STRATEGY_TABLE, data_name)
 
 
-def update_pension_model():
+def update_model():
     sim = estimate_model()
     export_model_data(sim)
 
 
 def main():
-    update_pension_model()
+    update_model()
 
 
 if __name__ == '__main__':

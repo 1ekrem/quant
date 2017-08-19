@@ -246,8 +246,11 @@ def BoostingPrediction(x, ans):
             if predicative == BOOSTING_INTERCEPT:
                 tmp = x.iloc[:, 0].copy() * np.nan
                 tmp = tmp.fillna(1.)
-            else:
+            elif predicative in x.columns:
                 tmp = StumpPrediction(x[predicative], estimation)
+            else:
+                tmp = x.iloc[:, 0].copy() * np.nan
+                tmp = tmp.fillna(0.)
             predictions[target].append(tmp * weight)
         results = []
         for k, v in predictions.iteritems():
