@@ -155,7 +155,8 @@ class TradingSim(object):
 
     def load_signal(self):
         logger.info('Loading signal')
-        self.signal = self.signal_loader(start_date=self._load_start, end_date=self._load_end)
+        signal = self.signal_loader(start_date=self._load_start, end_date=self._load_end)
+        self.signal = tu.resample(signal, self.timeline)
 
     def run_simulation(self):
         s = tu.resample(self.signal, self.timeline).iloc[:, 0]

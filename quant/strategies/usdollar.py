@@ -16,7 +16,7 @@ DATA_FREQUENCY = 'B'
 
 
 def usd_data_loader(*args, **kwargs):
-    ans = tu.get_timeseries(DATABASE_NAME, quandldata.QUANDL_FUTURES, column_list=['settle'], data_name='EUR/USD')
+    ans = tu.get_timeseries(DATABASE_NAME, quandldata.QUANDL_FUTURES, column_list=['settle'], data_name='US Dollar')
     ans.columns = ['US Dollar']
     return ans
 

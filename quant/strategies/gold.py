@@ -18,14 +18,14 @@ DATA_FREQUENCY = 'M'
 FORECAST_HORIZON = 1
 
 
-def usd_data_loader(*args, **kwargs):
-    ans = tu.get_timeseries(DATABASE_NAME, quandldata.QUANDL_FUTURES, column_list=['settle'], data_name='US Dollar')
-    ans.columns = ['US Dollar']
+def gold_data_loader(*args, **kwargs):
+    ans = tu.get_timeseries(DATABASE_NAME, quandldata.QUANDL_FUTURES, column_list=['settle'], data_name='Gold')
+    ans.columns = ['Gold']
     return ans
 
 
 def estimate_model(load_model=False):
-    simulation_name = 'USD'
+    simulation_name = 'Gold'
     econ = fred.get_fred_global_econ_list()
     input_data_loader = fred.fred_combined_loader
     strategy_component = mu.RandomBoostingComponent
@@ -36,7 +36,7 @@ def estimate_model(load_model=False):
     data_transform_func = mu.pandas_weeks_ewma
     default_params = None
     sim = ml.EconSim(start_date=START_DATE, end_date=dt.today(), sample_date=SAMLE_DATE, data_frequency=DATA_FREQUENCY,
-                     forecast_horizon=FORECAST_HORIZON, assets=['US Dollar'], asset_data_loader=usd_data_loader,
+                     forecast_horizon=FORECAST_HORIZON, assets=['Gold'], asset_data_loader=gold_data_loader,
                      inputs=econ, input_data_loader=input_data_loader, strategy_component=strategy_component,
                      position_component=position_component, simulation_name=simulation_name, model_path=MODEL_PATH,
                      load_model=load_model, simple_returns=True, cross_validation=cross_validation,
