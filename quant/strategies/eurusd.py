@@ -26,7 +26,7 @@ def eur_data_loader(*args, **kwargs):
 
 def estimate_model(load_model=False):
     simulation_name = 'EURUSD'
-    econ = fred.get_fred_us_eu_econ_list()
+    econ = fred.get_fred_global_econ_list()
     input_data_loader = fred.fred_combined_loader
     strategy_component = mu.RandomBoostingComponent
     position_component = pu.SimpleLongShort
@@ -34,7 +34,7 @@ def estimate_model(load_model=False):
     default_params = None
     simple_returns=True
     cross_validation=True
-    cross_validation_params=[{}] + [{'span': x} for x in np.arange(1, 14)]
+    cross_validation_params=[{}] + [{'span': x} for x in np.arange(1, 27)]
     cross_validation_buckets=5
     sim = ml.EconSim(start_date=START_DATE, end_date=dt.today(), sample_date=SAMLE_DATE, data_frequency=DATA_FREQUENCY,
                      forecast_horizon=FORECAST_HORIZON, assets=['EUR/USD'], asset_data_loader=eur_data_loader,

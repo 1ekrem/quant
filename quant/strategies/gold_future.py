@@ -14,21 +14,21 @@ SAMLE_DATE = dt(2017, 1, 1)
 DATA_FREQUENCY = 'B'
 
 
-def eur_data_loader(*args, **kwargs):
-    ans = tu.get_timeseries(DATABASE_NAME, quandldata.QUANDL_FUTURES, column_list=['settle'], data_name='EUR/USD')
-    ans.columns = ['EUR/USD']
+def gold_data_loader(*args, **kwargs):
+    ans = tu.get_timeseries(DATABASE_NAME, quandldata.QUANDL_FUTURES, column_list=['settle'], data_name='Gold')
+    ans.columns = ['Gold']
     return ans
 
 
-def eur_signal_loader(*args, **kwargs):
-    return tu.get_timeseries(DATABASE_NAME, STRATEGY_TABLE, column_list=['Signal'], data_name='EURUSD')
+def gold_signal_loader(*args, **kwargs):
+    return tu.get_timeseries(DATABASE_NAME, STRATEGY_TABLE, column_list=['Signal'], data_name='Gold')
 
 
 def estimate_model():
-    simulation_name = 'EUR_FUTURE'
-    signal_loader = eur_signal_loader
+    simulation_name = 'GOLD_FUTURE'
+    signal_loader = gold_signal_loader
     sim = pu.TradingSim(start_date=START_DATE, end_date=dt.today(), data_frequency=DATA_FREQUENCY,
-                        assets=['EUR/USD'], asset_data_loader=eur_data_loader,
+                        assets=['Gold'], asset_data_loader=gold_data_loader,
                         signal_loader=signal_loader, simulation_name=simulation_name)
     return sim
 

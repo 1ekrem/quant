@@ -36,7 +36,7 @@ US_ECON = [# Economic indicator
            # Current population survey
            'UNRATE', 'IC4WSA',
            # Housing
-           'HOUST', 'HOUST1F', 'CSUSHPINSA', 'MSPNHSUS', 'HSN1F',
+           'HOUST', 'HOUST1F', 'CSUSHPINSA', 'MSPNHSUS', 'HSN1F', 'DRCRELEXFACBS',
            # Industrial and manufacturing
            'INDPRO', 'DGORDER', 'NEWORDER',
            # Transportation
@@ -44,7 +44,7 @@ US_ECON = [# Economic indicator
            # Corporate bond yield
            'WAAA', 'WBAA', 'BAMLC0A4CBBBEY',
            # Risk indicator
-           'DRSFRMACBS', 'BAMLH0A0HYM2', 'BAMLC0A4CBBB', 'BAMLH0A3HYC', 'DRCCLACBS', 'USREC', 'USARECM',
+           'DRSFRMACBS', 'BAMLH0A0HYM2', 'BAMLC0A4CBBB', 'BAMLH0A3HYC', 'DRCCLACBS', 'USREC', 'USARECM', 'DRSREACBS',
            # QE
            'WSHOTS', 'WSHOMCB',
            ]
@@ -80,6 +80,9 @@ UK_ECON = [# Economic indicators
            # Real estate
            'QGBN628BIS', 'QGBR368BIS',
           ]
+EM_ECON = [# Risk indicators
+           'BAMLEMCBPIOAS', 'BAMLEMHBHYCRPIOAS', 'BAMLEM3BRRBBCRPIOAS',
+           ]
 US_SERIES = [# Stock
              'SP500', 'NASDAQCOM', 'DJIA', 'VIXCLS',
              # FX
@@ -337,7 +340,7 @@ def cache_series_release_data(series_name):
 
 
 def download_all_releases():
-    for series_name in US_ECON + CHINA_ECON + EU_ECON + UK_ECON:
+    for series_name in US_ECON + CHINA_ECON + EU_ECON + UK_ECON + EM_ECON:
         download_and_store_series_all_releases(series_name)
         cache_series_release_data(series_name)
 
@@ -357,7 +360,7 @@ def get_fred_us_eu_econ_list():
 
 
 def get_fred_global_econ_list():
-    return US_ECON + CHINA_ECON + EU_ECON
+    return US_ECON + CHINA_ECON + EU_ECON + UK_ECON + EM_ECON
 
 
 def get_cached_data(series_name, data_type, start_date=None, end_date=None):

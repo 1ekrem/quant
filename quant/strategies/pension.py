@@ -29,7 +29,7 @@ def spx_data_loader(*args, **kwargs):
 
 def estimate_pension_model(load_model=False):
     simulation_name = 'PENSION_SPX'
-    econ = fred.get_fred_us_econ_list()
+    econ = fred.get_fred_global_econ_list()
     input_data_loader = fred.fred_combined_loader
     strategy_component = mu.RandomBoostingComponent
     position_component = pu.SimpleLongOnly

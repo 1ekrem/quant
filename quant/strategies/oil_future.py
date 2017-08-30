@@ -14,21 +14,21 @@ SAMLE_DATE = dt(2017, 1, 1)
 DATA_FREQUENCY = 'B'
 
 
-def eur_data_loader(*args, **kwargs):
-    ans = tu.get_timeseries(DATABASE_NAME, quandldata.QUANDL_FUTURES, column_list=['settle'], data_name='EUR/USD')
-    ans.columns = ['EUR/USD']
+def oil_data_loader(*args, **kwargs):
+    ans = tu.get_timeseries(DATABASE_NAME, quandldata.QUANDL_FUTURES, column_list=['settle'], data_name='Crude Oil')
+    ans.columns = ['Crude Oil']
     return ans
 
 
-def eur_signal_loader(*args, **kwargs):
-    return tu.get_timeseries(DATABASE_NAME, STRATEGY_TABLE, column_list=['Signal'], data_name='EURUSD')
+def oil_signal_loader(*args, **kwargs):
+    return tu.get_timeseries(DATABASE_NAME, STRATEGY_TABLE, column_list=['Signal'], data_name='Oil')
 
 
 def estimate_model():
-    simulation_name = 'EUR_FUTURE'
-    signal_loader = eur_signal_loader
+    simulation_name = 'OIL_FUTURE'
+    signal_loader = oil_signal_loader
     sim = pu.TradingSim(start_date=START_DATE, end_date=dt.today(), data_frequency=DATA_FREQUENCY,
-                        assets=['EUR/USD'], asset_data_loader=eur_data_loader,
+                        assets=['Crude Oil'], asset_data_loader=oil_data_loader,
                         signal_loader=signal_loader, simulation_name=simulation_name)
     return sim
 
