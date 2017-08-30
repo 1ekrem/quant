@@ -22,21 +22,26 @@ FREDKEY = 'ff64294203f79127f8d004d2726386ac'
 _api = fredapi.Fred(api_key=FREDKEY)
 
 # data config
-US_ECON = [# Economic indicator
+US_ECON = [  # Economic indicator
            'PAYEMS', 'USSLIND', 'FRBLMCI',
            # Inflation
-           'T10YIE', 'T5YIFR', 'MICH', 'CPILFESL', 'PPIACO',
+           'T10YIE', 'T5YIFR', 'MICH', 'CPILFESL', 'PPIACO', 'CPIAUCSL', 'CPALTT01USQ661S', 'CPALTT01USM661S',
+           'CPALTT01USM659N',
            # Consumption
            'UMCSENT', 'PCEC96', 'TOTALSA', 'RSXFS',
+           # Auto
+           'M12MTVUSM227SFWA', 'AISRSA', 'DAUPSA', 'VMTD11', 'DAUTOSAAR', 'IPG3361T3S', 'LAUTOSA',
+           'AUESA', 'FAUTOSA', 'MAUISA', 'CAUISA', 'B149RC1Q027SBEA',
            # National income
            'GDP', 'GDPC1',
            # Interest rates
            'WGS10YR', 'WGS5YR', 'WGS2YR', 'WGS1YR', 'MORTGAGE30US', 'FF', 'DTB3', 'FEDFUNDS', 'DFEDTARU',
            'T10Y2Y', 'T10Y3M', 'BAMLH0A0HYM2EY', 'TEDRATE',
            # Current population survey
-           'UNRATE', 'IC4WSA',
+           'UNRATE', 'IC4WSA', 'U6RATE', 'LNS14027662', 'CCSA', 'UEMPMEAN', 'IURSA',
            # Housing
-           'HOUST', 'HOUST1F', 'CSUSHPINSA', 'MSPNHSUS', 'HSN1F', 'DRCRELEXFACBS',
+           'HOUST', 'HOUST1F', 'CSUSHPINSA', 'MSPNHSUS', 'HSN1F', 'DRCRELEXFACBS', 'CSUSHPISA', 'SPCS20RSA',
+           'PERMIT', 'RSAHORUSQ156S', 'MSPUS', 'COMPUTNSA',
            # Industrial and manufacturing
            'INDPRO', 'DGORDER', 'NEWORDER',
            # Transportation
@@ -48,42 +53,75 @@ US_ECON = [# Economic indicator
            # QE
            'WSHOTS', 'WSHOMCB',
            ]
-EU_ECON = [# Interest rates
+EU_ECON = [  # Interest rates
            'IRLTLT01DEM156N', 'BAMLHE00EHYIEY', 'BAMLHE00EHYIOAS', 'EUR3MTD156N', 'INTDSREZM193N',
            'BAMLEMRECRPIEMEAOAS', 'EUR12MD156N', 'BAMLEMRECRPIEMEAEY', 'INTGSBEZM193N',
+           # Unemployment
+           'LMUNRRTTDEM156S', 'LRUN74TTFRQ156N', 'LRHUTTTTITM156S', 'LRHUTTTTESM156S',
            # Economic indicator
-           'EUEPUINDXM', 'EUNNGDP', 'SLRTTO01OEQ659S', 'CLVMEURSCAB1GQEA19', 'CLVMNACSCAB1GQEU15',
-           'SLRTCR03OEQ661S', 'CRDQXMAPABIS',
+           'EUNNGDP', 'SLRTTO01OEQ659S', 'CLVMEURSCAB1GQEA19', 'CLVMNACSCAB1GQEU15',
+           'CRDQXMAPABIS',
+           # Real estate
+           'QESR628BIS', 'QDER628BIS', 'QESR368BIS', 'QDER368BIS', 'ODCNPI03DEQ180S', 'ODCNPI03DEQ659S',
+           'QISR628BIS', 'ODCNPI03ESQ470S', 'ODCNPI03ESQ659S',
+           # Auto
+           'SLRTCR03FRQ657S', 'SLRTCR03DEQ657S', 'SLRTCR03HUQ657S', 'SLRTCR03ITQ657S', 'SLRTCR03DKQ657S',
+           'SLRTCR03OEQ657S', 'CP0710EZ18M086NEST', 'CP0711EZ18M086NEST', 'SLRTCR03OEQ661S',
+           'SLRTCR03FRQ661S', 'SLRTCR03DEQ661S', 'SLRTCR03ESQ180S', 'SLRTCR03ESQ657S', 'SLRTCR03ITQ661S',
+           'SLRTCR03DKQ180S',
            # Inflation
-           'CP0000EZ19M086NEST', 'CPALTT01OEM661N', 'FPCPITOTLZGEUU',
+           'CP0000EZ19M086NEST', 'CPALTT01OEM661N', 'FPCPITOTLZGEUU', 'DEUCPIALLMINMEI',
            # Risk indicators
            'BAMLHE00EHYITRIV', 'EUROREC', 'EUEPUINDXM',
            # QE
            'ECBASSETS', 'RBXMBIS',
            ]
-CHINA_ECON = [# Economic indicator
-              'CHNCPIALLMINMEI', 'MKTGDPCNA646NWDB', 'CHNGDPNQDSMEI', 'CRDQCNAPABIS',
+CHINA_ECON = [  # Economic indicator
+              'MKTGDPCNA646NWDB', 'CHNGDPNQDSMEI', 'CRDQCNAPABIS',
               'XTEXVA01CNM667S', 'XTIMVA01CNM667S', 'SLRTTO02CNQ189N', 'PRENEL01CNQ656N',
               # Monetary policy
               'MYAGM2CNM189N', 'MANMM101CNM189S', 'MABMM301CNM189S',
               # Inflation
               'CHNCPIALLMINMEI', 'FPCPITOTLZGCHN',
               # Real estate
-              'QCNR368BIS',
+              'QCNR368BIS', 'QHKR368BIS', 'QCNN368BIS',
               # Interest rate
-              'INTDSRCNM193N',
+              'INTDSRCNM193N', 'QHKR628BIS', 'QCNN628BIS',
               # Risk indicators
               'VXFXICLS', 'CHIEPUINDXM', 'CHNRECM',
               ]
-UK_ECON = [# Economic indicators
-           'CLVMNACSCAB1GQUK', 'GBRCPIALLMINMEI', 'LMUNRRTTGBM156N', 'LORSGPORGBQ659S', 'CPALTT01GBM657N',
+UK_ECON = [  # Economic indicators
+           'CLVMNACSCAB1GQUK', 'LORSGPORGBQ659S', 'CPALTT01GBM657N',
+           # Inflation
+           'GBRCPIALLMINMEI',
            # Real estate
-           'QGBN628BIS', 'QGBR368BIS',
+           'QGBN628BIS', 'QCNR628BIS', 'QGBR628BIS', 'QGBR368BIS',
+           # Unemployment
+           'LMUNRRTTGBM156S', 'AURUKM',
+           # Auto
+           'SLRTCR03GBQ657S', 'SLRTCR03GBQ180N', 'SLRTCR03GBQ180S', 'CP0710GBM086NEST',
           ]
-EM_ECON = [# Risk indicators
+EM_ECON = [  # Risk indicators
            'BAMLEMCBPIOAS', 'BAMLEMHBHYCRPIOAS', 'BAMLEM3BRRBBCRPIOAS',
+           # Real estate
+           'Q4TR628BIS', 'Q4TR771BIS', 'QBRR628BIS',
+           # Inflation
+           'INDCPIALLMINMEI', 'BRACPIALLMINMEI', 'KORCPIALLMINMEI',
            ]
-US_SERIES = [# Stock
+ROW_ECON = [# Unemployment
+            'LRUNTTTTCAM156S', 'LRUN64TTJPM156S', 'LRHUTTTTJPM156S', 'LRHUTTTTCAM156S', 'LRHUTTTTAUM156S',
+            # Real estate
+            'QMYR628BIS', 'QCAR628BIS', 'QMYR368BIS', 'QCAR368BIS', 'ODCNPI03AUQ189S', 'ODCNPI03AUA156N',
+            'ODCNPI03AUQ657S', 'ODCNPI03AUQ659S', 'QKRR628BIS', 'AUSPERMITMISMEI', 'QKRR368BIS',
+            'QAUN628BIS', 'QAUR628BIS', 'QIDR368BIS', 'QCAN628BIS', 'QSGN628BIS', 'QMXN628BIS',
+            'QRUN628BIS',
+            # Inflation
+            'JPNCPIALLMINMEI', 'CPALCY01CAM661N', 'PALLFNFINDEXM', 'CPGRLE01JPM657N', 'AUSCPIALLQINMEI',
+            'MEXCPIALLMINMEI',
+            # Auto
+            'SLRTCR03AUQ659S', 'SLRTCR03AUQ180S', 'SLRTCR03AUQ657S', 'SLRTCR03JPQ657S', 'SLRTCR03JPQ180S',
+            ]
+US_SERIES = [  # Stock
              'SP500', 'NASDAQCOM', 'DJIA', 'VIXCLS',
              # FX
              'DEXUSEU', 'DEXUSUK', 'DEXUSNZ', 'DEXUSAL', 'DEXJPUS',
@@ -94,6 +132,23 @@ US_SERIES = [# Stock
              ]
 
 # utils
+def find_series(series_id):
+    ids = get_fred_global_econ_list()
+    if series_id in ids:
+        print(get_series_info(series_id))
+
+
+def check_series():
+    series = get_fred_global_econ_list()
+    if len(series) == len(set(series)):
+        print('Passed')
+    else:
+        tmp = sorted(series)
+        for i in xrange(len(tmp) - 1):
+            if tmp[i] == tmp[i + 1]:
+                print(tmp[i])
+
+
 def create_tables():
     du.create_timeseries_table(DATABASE_NAME, SERIES_TABLE_NAME)
     du.create_table(DATABASE_NAME, RELEASE_TABLE_NAME, TABLE_FORMAT)
@@ -233,7 +288,7 @@ def get_series_all_release(series_name, start_date=None, end_date=None):
     read_script = get_release_read_script(RELEASE_TABLE_NAME, index_range=(start_date, end_date), column_list=[series_name])
     success, data = du.execute_sql_output_script(DATABASE_NAME, read_script)
     if success:
-        return pd.DataFrame(np.array(data), columns=['time_index', 'realtime_start', 'series_name', 'value']) if len(data)>0 else None
+        return pd.DataFrame(np.array(data), columns=['time_index', 'realtime_start', 'series_name', 'value']) if len(data) > 0 else None
     else:
         logger.warning('Failed to read data: ' + str(data))
 
@@ -333,14 +388,13 @@ def cache_series_release_data(series_name):
         if revision is not None:
             revision.name = series_name + '|revision'
             ans.append(revision)
-        return ans
-        if len(ans)>0:
+        if len(ans) > 0:
             ans = pd.concat(ans, axis=1)
             tu.store_timeseries(ans, DATABASE_NAME, CACHE_TABLE_NAME)
 
 
 def download_all_releases():
-    for series_name in US_ECON + CHINA_ECON + EU_ECON + UK_ECON + EM_ECON:
+    for series_name in get_fred_global_econ_list():
         download_and_store_series_all_releases(series_name)
         cache_series_release_data(series_name)
 
@@ -360,7 +414,7 @@ def get_fred_us_eu_econ_list():
 
 
 def get_fred_global_econ_list():
-    return US_ECON + CHINA_ECON + EU_ECON + UK_ECON + EM_ECON
+    return US_ECON + CHINA_ECON + EU_ECON + UK_ECON + EM_ECON + ROW_ECON
 
 
 def get_cached_data(series_name, data_type, start_date=None, end_date=None):
