@@ -24,7 +24,8 @@ class EconSim(object):
                  asset_data_loader, inputs, input_data_loader, strategy_component, position_component,
                  simulation_name, model_path='', load_model=False, signal_model=False, data_transform_func=None,
                  default_params=None, data_missing_fail=DATA_MISSING_FAIL, simple_returns=False,
-                 cross_validation=False, cross_validation_params=None, cross_validation_buckets=5):
+                 cross_validation=False, cross_validation_params=None, cross_validation_buckets=5,
+                 smart_cross_validation=True):
         self.simulation_name = simulation_name
         self.model_path = model_path
         self.load_model = load_model
@@ -47,6 +48,7 @@ class EconSim(object):
         self.cross_validation = cross_validation
         self.cross_validation_params = cross_validation_params
         self.cross_validation_buckets = cross_validation_buckets
+        self.smart_cross_validation = smart_cross_validation
         assert self.forecast_horizon > 0
         self.run_sim()
 
@@ -125,16 +127,16 @@ class EconSim(object):
         seq = mu.get_cross_validation_buckets(len(in_sample), self.cross_validation_buckets)
         selection = None
         error_rate = 100.
-        total_calc = len(self.cross_validation_params) * self.cross_validation_buckets
         idx = 0
-        for param in self.cross_validation_params:
+        error_trace = []
+        for i, param in enumerate(self.cross_validation_params):
+            logger.info('Running on %s [%d of %d]' % (str(param), i+1, len(self.cross_validation_params)))
             errors = []
             validation_param = self.default_params.copy()
             validation_param.update(param)
             data = self.create_estimation_data(validation_param)
             for j in xrange(self.cross_validation_buckets):
                 idx += 1
-                logger.info('Running cross validation .. %.1f%%' % (100. * idx / total_calc))
                 bucket = seq[j]
                 validation = in_sample.iloc[bucket]
                 estimation = in_sample.loc[~in_sample.index.isin(validation.index)]
@@ -144,10 +146,17 @@ class EconSim(object):
                     iteration_error = mu.StumpError(model.signal.iloc[:, 0], validation_returns.iloc[:, 0], 0.)
                     errors.append(iteration_error)
             errors = np.mean(errors)
-            logger.info('Error rate %.1f%%: %s' % (100. * errors, str(validation_param)))
+            error_trace.append(errors)
+            logger.info('Finished, error rate %.1f%%' % (100. * errors))
             if errors < error_rate:
                 error_rate = errors
                 selection = validation_param
+            if self.smart_cross_validation and len(error_trace) > 5:
+                if np.mean(error_trace[-6:-3]) < np.mean(error_trace[-3:]):
+                    logger.info('Error rate not declining any more, search terminated.')
+                    break
+                else:
+                    logger.info('Latest error rates: %s' % str(error_trace[-6:]))
         if selection is None:
             return None, None, None
         else:
