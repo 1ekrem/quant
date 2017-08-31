@@ -43,7 +43,7 @@ US_ECON = [  # Economic indicator
            'HOUST', 'HOUST1F', 'CSUSHPINSA', 'MSPNHSUS', 'HSN1F', 'DRCRELEXFACBS', 'CSUSHPISA', 'SPCS20RSA',
            'PERMIT', 'RSAHORUSQ156S', 'MSPUS', 'COMPUTNSA',
            # Industrial and manufacturing
-           'INDPRO', 'DGORDER', 'NEWORDER',
+           'INDPRO', 'DGORDER', 'NEWORDER', 'BUSLOANS', 'IPMAN', 'TCU', 'DRBLACBS',
            # Transportation
            'RAILFRTINTERMODAL',
            # Corporate bond yield
@@ -75,20 +75,27 @@ EU_ECON = [  # Interest rates
            'BAMLHE00EHYITRIV', 'EUROREC', 'EUEPUINDXM',
            # QE
            'ECBASSETS', 'RBXMBIS',
+           # Industrial production
+           'PRINTO01OEQ659S', 'PRINTO01OEQ661S', 'PRMNTO01OEQ661S', 'PRMNTO01OEQ657S', 'PRCNTO01OEQ659S',
+           'PRCNTO01OEQ661S', 'DEUPROINDMISMEI', 'PRMNTO01DEQ657S', 'ITAPROINDMISMEI', 'PRINTO01ITQ659S',
            ]
 CHINA_ECON = [  # Economic indicator
-              'MKTGDPCNA646NWDB', 'CHNGDPNQDSMEI', 'CRDQCNAPABIS',
+              'MKTGDPCNA646NWDB', 'CHNGDPNQDSMEI', 'CRDQCNAPABIS', 'TRESEGCNM052N', 'XTEXVA01CNM664S',
               'XTEXVA01CNM667S', 'XTIMVA01CNM667S', 'SLRTTO02CNQ189N', 'PRENEL01CNQ656N',
+              'SLRTTO02CNQ189S', 'XTIMVA01CNM659S',
               # Monetary policy
-              'MYAGM2CNM189N', 'MANMM101CNM189S', 'MABMM301CNM189S',
+              'MYAGM2CNM189N', 'MANMM101CNM189S', 'MABMM301CNM189S', 'MYAGM1CNM189N', 'MANMM101CNM657S',
+              'QCNPAM770A', 'QCNPAMUSDA',
               # Inflation
-              'CHNCPIALLMINMEI', 'FPCPITOTLZGCHN',
+              'CHNCPIALLMINMEI', 'FPCPITOTLZGCHN', 'CPALTT01CNM659N',
               # Real estate
               'QCNR368BIS', 'QHKR368BIS', 'QCNN368BIS',
               # Interest rate
               'INTDSRCNM193N', 'QHKR628BIS', 'QCNN628BIS',
               # Risk indicators
               'VXFXICLS', 'CHIEPUINDXM', 'CHNRECM',
+              # Industrial production
+              'PRINTO01CNQ663N',
               ]
 UK_ECON = [  # Economic indicators
            'CLVMNACSCAB1GQUK', 'LORSGPORGBQ659S', 'CPALTT01GBM657N',
@@ -100,6 +107,10 @@ UK_ECON = [  # Economic indicators
            'LMUNRRTTGBM156S', 'AURUKM',
            # Auto
            'SLRTCR03GBQ657S', 'SLRTCR03GBQ180N', 'SLRTCR03GBQ180S', 'CP0710GBM086NEST',
+           # Industrial production
+           'GBRPROINDMISMEI', 'IPIUKM', 'PRINTO01GBQ659S', 'PRMNTO01GBQ657S', 'PRCNTO01GBQ659S',
+           # Risk indicator
+           'GBRRECM',
           ]
 EM_ECON = [  # Risk indicators
            'BAMLEMCBPIOAS', 'BAMLEMHBHYCRPIOAS', 'BAMLEM3BRRBBCRPIOAS',
@@ -107,6 +118,8 @@ EM_ECON = [  # Risk indicators
            'Q4TR628BIS', 'Q4TR771BIS', 'QBRR628BIS',
            # Inflation
            'INDCPIALLMINMEI', 'BRACPIALLMINMEI', 'KORCPIALLMINMEI',
+           # Industrial production
+           'BRAPROINDMISMEI', 'PRINTO01BRQ659S',
            ]
 ROW_ECON = [# Unemployment
             'LRUNTTTTCAM156S', 'LRUN64TTJPM156S', 'LRHUTTTTJPM156S', 'LRHUTTTTCAM156S', 'LRHUTTTTAUM156S',
@@ -120,6 +133,9 @@ ROW_ECON = [# Unemployment
             'MEXCPIALLMINMEI',
             # Auto
             'SLRTCR03AUQ659S', 'SLRTCR03AUQ180S', 'SLRTCR03AUQ657S', 'SLRTCR03JPQ657S', 'SLRTCR03JPQ180S',
+            # Industrial production
+            'AUSPROINDQISMEI', 'PRINTO01AUQ659S', 'PRCNTO01AUQ659S', 'CANPROINDMISMEI', 'PRINTO01CAQ659S',
+            'PRCNTO01CAQ659S', 'PRINTO02MXQ661S', 'PRINTO01MXQ657S',
             ]
 US_SERIES = [  # Stock
              'SP500', 'NASDAQCOM', 'DJIA', 'VIXCLS',
@@ -386,6 +402,7 @@ def cache_series_release_data(series_name):
             ans.append(change)
         revision = calculate_revision(data)
         if revision is not None:
+            revision = tu.resample(revision, release, carry_forward=False).fillna(0.)
             revision.name = series_name + '|revision'
             ans.append(revision)
         if len(ans) > 0:

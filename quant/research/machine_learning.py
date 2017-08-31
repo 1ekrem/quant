@@ -151,12 +151,11 @@ class EconSim(object):
             if errors < error_rate:
                 error_rate = errors
                 selection = validation_param
-            if self.smart_cross_validation and len(error_trace) > 5:
+            if self.smart_cross_validation and len(error_trace) > 6:
+                logger.info('Latest error rates: %s' % str(error_trace[-6:]))
                 if np.mean(error_trace[-6:-3]) < np.mean(error_trace[-3:]):
                     logger.info('Error rate not declining any more, search terminated.')
                     break
-                else:
-                    logger.info('Latest error rates: %s' % str(error_trace[-6:]))
         if selection is None:
             return None, None, None
         else:
