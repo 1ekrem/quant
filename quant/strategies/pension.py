@@ -3,6 +3,7 @@ Created on 26 Jul 2017
 
 @author: wayne
 '''
+import sys
 import numpy as np
 import pandas as pd
 from datetime import datetime as dt
@@ -75,7 +76,10 @@ def update_pension_model():
 
 
 def main():
-    update_pension_model()
+    if len(sys.argv) == 1:
+        update_pension_model()
+    elif len(sys.argv) == 2 and sys.argv[1] == 'model':
+        create_pension_model()
 
 
 if __name__ == '__main__':

@@ -390,6 +390,7 @@ def cache_series_release_data(series_name):
             ans.append(revision)
         if len(ans) > 0:
             ans = pd.concat(ans, axis=1)
+            logger.info('Storing derived series release data - %s' % series_name)
             tu.store_timeseries(ans, DATABASE_NAME, CACHE_TABLE_NAME)
 
 
