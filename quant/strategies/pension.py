@@ -37,6 +37,7 @@ def estimate_pension_model(load_model=False):
     cross_validation=True
     cross_validation_params=[{}] + [{'span': x} for x in np.arange(1, 27)]
     cross_validation_buckets=5
+    smart_cross_validation=False
     data_transform_func = mu.pandas_weeks_ewma
     default_params = None
     sim = ml.EconSim(start_date=START_DATE, end_date=dt.today(), sample_date=SAMLE_DATE, data_frequency=DATA_FREQUENCY,
@@ -45,7 +46,8 @@ def estimate_pension_model(load_model=False):
                      position_component=position_component, simulation_name=simulation_name, model_path=MODEL_PATH,
                      load_model=load_model, simple_returns=False, cross_validation=cross_validation,
                      cross_validation_params=cross_validation_params, cross_validation_buckets=cross_validation_buckets,
-                     data_transform_func=data_transform_func, default_params=default_params)
+                     data_transform_func=data_transform_func, default_params=default_params,
+                     smart_cross_validation=smart_cross_validation)
     return sim
 
 

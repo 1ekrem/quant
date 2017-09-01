@@ -25,7 +25,7 @@ class EconSim(object):
                  simulation_name, model_path='', load_model=False, signal_model=False, data_transform_func=None,
                  default_params=None, data_missing_fail=DATA_MISSING_FAIL, simple_returns=False,
                  cross_validation=False, cross_validation_params=None, cross_validation_buckets=5,
-                 smart_cross_validation=True):
+                 smart_cross_validation=False):
         self.simulation_name = simulation_name
         self.model_path = model_path
         self.load_model = load_model
@@ -152,7 +152,7 @@ class EconSim(object):
                 error_rate = errors
                 selection = validation_param
             if self.smart_cross_validation and len(error_trace) > 6:
-                logger.info('Latest error rates: %s' % str(error_trace[-6:]))
+                logger.info('Latest error rates: %s' % str(np.round(error_trace[-6:], 4)))
                 if np.mean(error_trace[-6:-3]) < np.mean(error_trace[-3:]):
                     logger.info('Error rate not declining any more, search terminated.')
                     break

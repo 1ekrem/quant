@@ -28,7 +28,7 @@ US_ECON = [  # Economic indicator
            'T10YIE', 'T5YIFR', 'MICH', 'CPILFESL', 'PPIACO', 'CPIAUCSL', 'CPALTT01USQ661S', 'CPALTT01USM661S',
            'CPALTT01USM659N',
            # Consumption
-           'UMCSENT', 'PCEC96', 'TOTALSA', 'RSXFS',
+           'PCE', 'BPCCRO1Q156NBEA', 'UMCSENT', 'DPCERO1Q156NBEA', 'PCEDG', 'PCEC96', 'TOTALSA', 'RSXFS',
            # Auto
            'M12MTVUSM227SFWA', 'AISRSA', 'DAUPSA', 'VMTD11', 'DAUTOSAAR', 'IPG3361T3S', 'LAUTOSA',
            'AUESA', 'FAUTOSA', 'MAUISA', 'CAUISA', 'B149RC1Q027SBEA',
@@ -78,6 +78,8 @@ EU_ECON = [  # Interest rates
            # Industrial production
            'PRINTO01OEQ659S', 'PRINTO01OEQ661S', 'PRMNTO01OEQ661S', 'PRMNTO01OEQ657S', 'PRCNTO01OEQ659S',
            'PRCNTO01OEQ661S', 'DEUPROINDMISMEI', 'PRMNTO01DEQ657S', 'ITAPROINDMISMEI', 'PRINTO01ITQ659S',
+           # Consumption
+           'NAEXKP02DEQ659S', 'NAEXKP02FRQ659S', 'NAEXKP02ITQ659S', 'NAEXKP02ESQ659S', 'NAEXKP02NLQ659S',
            ]
 CHINA_ECON = [  # Economic indicator
               'MKTGDPCNA646NWDB', 'CHNGDPNQDSMEI', 'CRDQCNAPABIS', 'TRESEGCNM052N', 'XTEXVA01CNM664S',
@@ -111,6 +113,8 @@ UK_ECON = [  # Economic indicators
            'GBRPROINDMISMEI', 'IPIUKM', 'PRINTO01GBQ659S', 'PRMNTO01GBQ657S', 'PRCNTO01GBQ659S',
            # Risk indicator
            'GBRRECM',
+           # Consumption
+           'NAEXKP02GBQ189S', 'NAEXKP02GBQ659S', 'RLCMEXUKQ',
           ]
 EM_ECON = [  # Risk indicators
            'BAMLEMCBPIOAS', 'BAMLEMHBHYCRPIOAS', 'BAMLEM3BRRBBCRPIOAS',
@@ -120,6 +124,8 @@ EM_ECON = [  # Risk indicators
            'INDCPIALLMINMEI', 'BRACPIALLMINMEI', 'KORCPIALLMINMEI',
            # Industrial production
            'BRAPROINDMISMEI', 'PRINTO01BRQ659S',
+           # Consumption
+           'NAEXKP02BRQ659S',
            ]
 ROW_ECON = [# Unemployment
             'LRUNTTTTCAM156S', 'LRUN64TTJPM156S', 'LRHUTTTTJPM156S', 'LRHUTTTTCAM156S', 'LRHUTTTTAUM156S',
@@ -136,6 +142,8 @@ ROW_ECON = [# Unemployment
             # Industrial production
             'AUSPROINDQISMEI', 'PRINTO01AUQ659S', 'PRCNTO01AUQ659S', 'CANPROINDMISMEI', 'PRINTO01CAQ659S',
             'PRCNTO01CAQ659S', 'PRINTO02MXQ661S', 'PRINTO01MXQ657S',
+            # Consumption
+            'NAEXKP02AUQ659S', 'NAEXKP02CAQ659S',
             ]
 US_SERIES = [  # Stock
              'SP500', 'NASDAQCOM', 'DJIA', 'VIXCLS',
