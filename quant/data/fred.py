@@ -495,6 +495,19 @@ def get_fred_combined(series_name, start_date=None, end_date=None):
     return None if len(ans) == 0 else pd.concat(ans, axis=1)
 
 
+def get_fred_core(series_name, start_date=None, end_date=None):
+    ans = []
+    release = get_fred_extended_first_release(series_name, start_date, end_date)
+    if release is not None:
+        release.name = series_name + '|release'
+        ans.append(release)
+    change = get_fred_annual_change(series_name, start_date, end_date)
+    if change is not None:
+        change.name = series_name + '|annualchange'
+        ans.append(change)
+    return None if len(ans) == 0 else pd.concat(ans, axis=1)
+
+
 def fred_release_loader(tickers, start_date=None, end_date=None):
     return dict([(ticker, get_fred_extended_first_release(ticker, start_date, end_date)) for ticker in tickers])
 
@@ -513,6 +526,10 @@ def fred_revision_loader(tickers, start_date=None, end_date=None):
 
 def fred_combined_loader(tickers, start_date=None, end_date=None):
     return dict([(ticker, get_fred_combined(ticker, start_date, end_date)) for ticker in tickers])
+
+
+def fred_core_loader(tickers, start_date=None, end_date=None):
+    return dict([(ticker, get_fred_core(ticker, start_date, end_date)) for ticker in tickers])
 
 
 def main():
