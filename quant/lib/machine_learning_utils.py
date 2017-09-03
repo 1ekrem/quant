@@ -330,9 +330,10 @@ class Component(object):
         self.distribution_params = tu.get_distribution_parameters(self.in_sample_data)
         in_sample_data = self.in_sample_data
         out_of_sample_data = self.out_of_sample_data
-        self._x = in_sample_data.fillna(in_sample_data.median(axis=0))
+        medians = in_sample_data.median(axis=0)
+        self._x = in_sample_data.fillna(medians)
         self._y = self.asset_returns.fillna(0.)
-        self._z = out_of_sample_data.fillna(out_of_sample_data.median(axis=0))
+        self._z = out_of_sample_data.fillna(medians)
 
     def estimate_model(self):
         if self.model is None:
