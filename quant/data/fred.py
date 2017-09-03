@@ -501,6 +501,10 @@ def get_fred_core(series_name, start_date=None, end_date=None):
     if release is not None:
         release.name = series_name + '|release'
         ans.append(release)
+    change = get_fred_change(series_name, start_date, end_date)
+    if change is not None:
+        change.name = series_name + '|change'
+        ans.append(change)
     change = get_fred_annual_change(series_name, start_date, end_date)
     if change is not None:
         change.name = series_name + '|annualchange'
