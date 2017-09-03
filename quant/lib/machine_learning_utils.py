@@ -5,7 +5,6 @@ Created on 23 Jun 2017
 '''
 import numpy as np
 import pandas as pd
-from scipy import stats as ss
 from quant.lib import timeseries_utils as tu
 from quant.lib.main_utils import logger
 
