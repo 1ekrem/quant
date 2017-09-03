@@ -70,9 +70,10 @@ def StumpError(x, y, c):
     return error / total if total > 0 and not np.isnan(c) else np.nan
 
 
-def DummyStump(x, y):
+def DummyStump2(x, y):
     '''
     Stump estimation of a single iteration. 
+    Backup function
     '''
     data = pd.concat([x, y], axis=1).copy().values
     data = data[np.argsort(x.values)]
@@ -93,6 +94,32 @@ def DummyStump(x, y):
     if ploc > .5:
         ploc = 1. - ploc
     return cutoff, ploc, 2. * np.max(score)
+
+
+def DummyStump(x, y):
+    data_x = np.array(x).flatten()
+    data_y = np.array(y).flatten()
+    tot = np.sum(np.abs(data_y))
+    if tot > 0:
+        data_y /= tot 
+    data = np.array(zip(data_x, data_y), dtype=[('x', np.float64), ('y', np.float64)])
+    data = np.sort(data, order='x')
+    pos = data['y'].copy()
+    pos[pos < 0.] = 0.
+    pos = np.cumsum(pos)
+    neg = data['y'].copy()
+    neg[neg > 0.] = 0.
+    neg = np.append(np.cumsum(neg[::-1])[:-1][::-1], 0.)
+    score = np.abs(pos - neg - 0.5)
+    cutoff = np.append(.5 * (data['x'][:-1] + data['x'][1:]), data['x'][-1] + 1.)
+    loc = np.arange(len(data_x))
+    loc = loc[score == np.max(score)][-1]
+    cutoff = cutoff[loc]
+    ploc = loc / len(data_x)
+    if ploc > .5:
+        ploc = 1. - ploc
+    score = 2. * score[loc]
+    return cutoff, ploc, score
 
 
 def get_weight_from_error(e):

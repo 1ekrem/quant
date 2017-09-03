@@ -88,13 +88,13 @@ class TestStumpError(unittest.TestCase):
 class TestDummyStump(unittest.TestCase):
     
     def testEqualOutcome(self):
-        self.assertEqual(10., mu.DummyStump(d, pd.Series(np.zeros(10))))
+        self.assertEqual(10., mu.DummyStump(d, pd.Series(np.zeros(10)))[0])
 
     def testEqualInput(self):
-        self.assertEqual(0., mu.DummyStump(0. * d, pd.Series(b)))
+        self.assertEqual(0., mu.DummyStump(0. * d, pd.Series(b))[0])
 
     def testCalculation(self):
-        self.assertEqual(2.5, mu.DummyStump(d, pd.Series(b)))
+        self.assertEqual(2.5, mu.DummyStump(d, pd.Series(b))[0])
 
 
 class TestStumpPrediction(unittest.TestCase):
