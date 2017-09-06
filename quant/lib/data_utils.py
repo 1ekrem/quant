@@ -26,6 +26,7 @@ TIMESERIES_TABLE_FORMAT = "time_index DATETIME, column_name VARCHAR(50), value D
 T2_TIMESERIES_TABLE_FORMAT = "time_index DATETIME, data_name VARCHAR(50), column_name VARCHAR(50), value DOUBLE"
 BULK_TABLE_INSERT = "INSERT INTO %s %s VALUES %s;"
 BULK_TABLE_DELETE = "DELETE FROM %s WHERE %s in (%s);"
+DELETE_DATA = "DELETE FROM %s %s;"
 READ_TABLE = "SELECT %s FROM %s %s;"
 READ_COLUMN_VALUES = "SELECT DISTINCT(%s) FROM %s;"
 
@@ -128,6 +129,11 @@ def get_pandas_read_script(table_name, column_name, index_name, value_name, inde
     return READ_TABLE % (read_format_script, table_name, condition_script)
 
 
+def get_pandas_delete_script(table_name, column_name, index_name, value_name, index_range=None, column_list=None, data_name=None):
+    condition_script = get_pandas_select_condition_script(index_name, column_name, index_range, column_list, data_name)
+    return DELETE_DATA % (table_name, condition_script)
+
+
 def get_table_column_value_scripts(table_name, column_name=TIMESERIES_COLUMN_NAME):
     return READ_COLUMN_VALUES % (column_name, table_name)
 
@@ -208,6 +214,13 @@ def pandas_read(database_name, table_name, column_name, index_name, value_name, 
         return get_pandas_output(data, column_name, index_name, value_name) if len(data)>0 else None
     else:
         logger.warning('Failed to read data: ' + str(data))
+
+
+def pandas_delete(database_name, table_name, column_name, index_name, value_name, index_range=None, column_list=None, data_name=None):
+    delete_script = get_pandas_delete_script(table_name, column_name, index_name, value_name, index_range, column_list, data_name)
+    e = execute_sql_input_script(database_name, delete_script)
+    if e is not None:
+        logger.warning('Failed to delete data from table: ' + str(e))
 
 
 def get_table_column_values(database_name, table_name, column_name=TIMESERIES_COLUMN_NAME):

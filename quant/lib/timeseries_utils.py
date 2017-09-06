@@ -61,6 +61,10 @@ def store_timeseries(ts, database_name, table_name, data_name=None):
                           du.TIMESERIES_VALUE_NAME, data_name, du.TIMESERIES_DATA_NAME)
 
 
+def delete_timeseries(database_name, table_name, index_range=None, column_list=None, data_name=None):
+    du.pandas_delete(database_name, table_name, du.TIMESERIES_COLUMN_NAME, du.TIMESERIES_INDEX_NAME, du.TIMESERIES_VALUE_NAME, index_range, column_list, data_name)
+
+
 def get_timeseries(database_name, table_name, index_range=None, column_list=None, data_name=None):
     return du.pandas_read(database_name, table_name, du.TIMESERIES_COLUMN_NAME, du.TIMESERIES_INDEX_NAME, du.TIMESERIES_VALUE_NAME, index_range, column_list, data_name)
 
@@ -83,3 +87,13 @@ def get_distribution_scores(data, params):
     ans.loc[:, :] = ss.norm.cdf(ans.values)
     ans[data.isnull()] = np.nan
     return ans
+
+
+def pandas_ewma(data, span=None, *args, **kwargs):
+    return data.ewm(span=span, ignore_na=True).mean() if span > 1. else data
+
+
+def pandas_weeks_ewma(data, span=None, *args, **kwargs):
+    df = data.index.to_series().diff().dropna().mean()
+    es = 7. * span / df.days if span is not None else None
+    return data.ewm(span=es, ignore_na=True).mean() if es > 1. else data 

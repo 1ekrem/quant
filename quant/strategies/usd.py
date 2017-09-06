@@ -33,8 +33,8 @@ def estimate_model(load_model=False):
     cross_validation=True
     cross_validation_params=[{}] + [{'span': x} for x in np.arange(1, 27)]
     cross_validation_buckets=5
-    smart_cross_validation=False
-    data_transform_func = mu.pandas_weeks_ewma
+    smart_cross_validation=True
+    data_transform_func = tu.pandas_weeks_ewma
     default_params = None
     sim = ml.EconSim(start_date=START_DATE, end_date=dt.today(), sample_date=SAMLE_DATE, data_frequency=DATA_FREQUENCY,
                      forecast_horizon=FORECAST_HORIZON, assets=['US Dollar'], asset_data_loader=usd_data_loader,
