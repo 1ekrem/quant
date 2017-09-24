@@ -9,7 +9,6 @@ from scipy import stats as ss
 from quant.lib import data_utils as du
 
 
-
 def resample(ts, timeline, carry_forward=True):
     assert isinstance(ts, pd.Series) or isinstance(ts, pd.DataFrame)
     assert isinstance(timeline, pd.Series) or isinstance(timeline, pd.DataFrame)
@@ -61,6 +60,11 @@ def store_timeseries(ts, database_name, table_name, data_name=None):
                           du.TIMESERIES_VALUE_NAME, data_name, du.TIMESERIES_DATA_NAME)
 
 
+def store_description(des, database_name, table_name):
+    du.pandas_bulk_insert(des, database_name, table_name, du.DESCRIPTION_COLUMN_NAME, du.DESCRIPTION_INDEX_NAME,
+                          du.DESCRIPTION_VALUE_NAME)
+    
+
 def delete_timeseries(database_name, table_name, index_range=None, column_list=None, data_name=None):
     du.pandas_delete(database_name, table_name, du.TIMESERIES_COLUMN_NAME, du.TIMESERIES_INDEX_NAME, du.TIMESERIES_VALUE_NAME, index_range, column_list, data_name)
 
@@ -68,6 +72,14 @@ def delete_timeseries(database_name, table_name, index_range=None, column_list=N
 def get_timeseries(database_name, table_name, index_range=None, column_list=None, data_name=None):
     return du.pandas_read(database_name, table_name, du.TIMESERIES_COLUMN_NAME, du.TIMESERIES_INDEX_NAME, du.TIMESERIES_VALUE_NAME, index_range, column_list, data_name)
 
+
+def get_description(database_name, table_name, column_list=None):
+    return du.pandas_read(database_name, table_name, du.DESCRIPTION_COLUMN_NAME, du.DESCRIPTION_INDEX_NAME, du.DESCRIPTION_VALUE_NAME, None, column_list, None)    
+
+
+def delete_description(database_name, table_name, column_list=None):
+    du.pandas_delete(database_name, table_name, du.DESCRIPTION_COLUMN_NAME, du.DESCRIPTION_INDEX_NAME, du.DESCRIPTION_VALUE_NAME, None, column_list, None)
+    
 
 def get_distribution_parameters(data):
     '''

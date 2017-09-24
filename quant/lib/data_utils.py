@@ -20,10 +20,14 @@ TIMESERIES_INDEX_NAME = 'time_index'
 TIMESERIES_COLUMN_NAME = 'column_name'
 TIMESERIES_DATA_NAME = 'data_name'
 TIMESERIES_VALUE_NAME = 'value'
+DESCRIPTION_INDEX_NAME = 'column_name'
+DESCRIPTION_COLUMN_NAME = 'data_name'
+DESCRIPTION_VALUE_NAME = 'value'
 DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 CREATE_TABLE_IF_NOT_EXISTS = "CREATE TABLE IF NOT EXISTS %s (%s);"
 TIMESERIES_TABLE_FORMAT = "time_index DATETIME, column_name VARCHAR(50), value DOUBLE"
 T2_TIMESERIES_TABLE_FORMAT = "time_index DATETIME, data_name VARCHAR(50), column_name VARCHAR(50), value DOUBLE"
+DESCRIPTION_TABLE_FORMAT = "data_name VARCHAR(50), column_name VARCHAR(50), value VARCHAR(300)"
 BULK_TABLE_INSERT = "INSERT INTO %s %s VALUES %s;"
 BULK_TABLE_DELETE = "DELETE FROM %s WHERE %s in (%s);"
 DELETE_DATA = "DELETE FROM %s %s;"
@@ -188,6 +192,10 @@ def create_timeseries_table(database_name, table_name):
 
 def create_t2_timeseries_table(database_name, table_name):
     create_table(database_name, table_name, T2_TIMESERIES_TABLE_FORMAT)
+
+
+def create_description_table(database_name, table_name):
+    create_table(database_name, table_name, DESCRIPTION_TABLE_FORMAT)
 
 
 def pandas_bulk_insert(data, database_name, table_name, column_name, index_name, value_name, data_name=None, data_column_name=None):

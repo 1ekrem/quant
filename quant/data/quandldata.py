@@ -70,7 +70,8 @@ def quandl_price_loader(series, start_date=None, end_date=None):
         if data is not None:
             ans.append(data)
     return pd.concat(ans, axis=1) if len(ans)>0 else None
-    
+
+
 # Main function
 def download_all_series():
     for series_name, series_id in FUTURES.iteritems():
