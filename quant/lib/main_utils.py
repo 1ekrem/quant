@@ -13,7 +13,6 @@ from email.mime.base import MIMEBase
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 from email import encoders
-from patsy.state import scale
 
 logging.basicConfig(format='%(asctime)s %(message)s')
 logger = logging.getLogger('quant')

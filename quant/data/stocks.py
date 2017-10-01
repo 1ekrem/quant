@@ -79,7 +79,17 @@ def download_stock_prices(stock_id):
     # data = load_quandl_stock_prices(stock_id)
     data = load_yahoo_stock_prices(stock_id, dt(2000,1,1), dt.today())
     if data is not None:
-        tu.store_timeseries(data, DATABASE_NAME, STOCKS, stock_id)
+        try:
+            if len(data) > 1:
+                c = data / data.shift()
+                idx = c.index[-1]
+                if c.loc[idx, 'Adj Close'] > 50.:
+                    for col in ['Adj Close', 'Close', 'High', 'Low', 'Open']:
+                        data.loc[idx, col] /= 100.
+            tu.store_timeseries(data, DATABASE_NAME, STOCKS, stock_id)
+        except:
+            print(stock_id)
+            print(data)
 
 
 def download_stock_universe(universe):
