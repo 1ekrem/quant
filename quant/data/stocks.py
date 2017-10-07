@@ -4,15 +4,14 @@ Created on 18 Sep 2017
 @author: wayne
 '''
 import os
+import time
 import numpy as np
 import pandas as pd
-import fix_yahoo_finance as yf
 from datetime import datetime as dt, timedelta
 from quant.lib import data_utils as du, timeseries_utils as tu
 from quant.lib.main_utils import logger
-from pandas_datareader import data as pdr
 from quant.data import quandldata
-yf.pdr_override()
+
 
 DATABASE_NAME = 'quant'
 STOCKS = 'stocks'
@@ -40,22 +39,6 @@ def import_tickers(filename, universe):
     if data is not None:
         data.name = universe
         tu.store_description(data, DATABASE_NAME, STOCKS_DESCRIPTION)
-
-
-def get_yahoo_stock_id(stock_id):
-    if stock_id.endswith(' LN'):
-        return stock_id[:-3] + '.L'
-    else:
-        return stock_id
-
-
-def load_yahoo_stock_prices(stock_id, start_date=dt(2010,1,1), end_date=dt.today()):
-    yahoo_id = get_yahoo_stock_id(stock_id)
-    try:
-        return pdr.get_data_yahoo(yahoo_id, start=start_date.strftime('%Y-%m-%d'), end=end_date.strftime('%Y-%m-%d'))
-    except:
-        logger.warn('Failed to load Yahoo price for %s' % stock_id)
-        return None
     
 
 def get_quandl_stock_id(stock_id):
@@ -76,20 +59,9 @@ def load_quandl_stock_prices(stock_id):
 
 def download_stock_prices(stock_id):
     logger.info('Downloading stock prices - %s' % stock_id)
-    # data = load_quandl_stock_prices(stock_id)
-    data = load_yahoo_stock_prices(stock_id, dt(2000,1,1), dt.today())
+    data = load_quandl_stock_prices(stock_id)
     if data is not None:
-        try:
-            if len(data) > 1:
-                c = data / data.shift()
-                idx = c.index[-1]
-                if c.loc[idx, 'Adj Close'] > 50.:
-                    for col in ['Adj Close', 'Close', 'High', 'Low', 'Open']:
-                        data.loc[idx, col] /= 100.
-            tu.store_timeseries(data, DATABASE_NAME, STOCKS, stock_id)
-        except:
-            print(stock_id)
-            print(data)
+        tu.store_timeseries(data, DATABASE_NAME, STOCKS, stock_id)
 
 
 def download_stock_universe(universe):
@@ -146,14 +118,17 @@ def calculate_beta_and_returns(rtns, lookback, min_obs):
     
 
 def calculate_universe_betas_and_returns(universe, index_ticker, start_date=None, lookback=52, min_obs=26):
-    u = tu.get_description(DATABASE_NAME, STOCKS_DESCRIPTION, [universe])
+    if isinstance(universe, str):
+        u = tu.get_description(DATABASE_NAME, STOCKS_DESCRIPTION, [universe])
+    else:
+        u = universe
     if u is not None:
         idx = load_stock_index(index_ticker)
         for stock_id in u.index:
             stock = load_stock_prices(stock_id)
             if stock is not None:
                 logger.info('Calculating betas and returns - %s' % stock_id)
-                stock = stock['Adj Close']
+                stock = stock['Price']
                 stock = stock.ffill(limit=5)
                 rtns = pd.concat([idx.resample('W').last(), stock.resample('W').last()], axis=1)
                 rtns = rtns.diff() / rtns.shift()

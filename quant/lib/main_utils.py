@@ -65,16 +65,19 @@ def get_table_html(table, inc_index=True, inc_columns=True, width=None):
     for i in xrange(nrows):
         line_text = ''''''
         if i % 2 == 0:
-            bg_text = ''' bgcolor="#D9D9D9" '''
+            bg_text = '''bgcolor="#D9D9D9"'''
         else:
-            bg_text = ''
+            bg_text = ''''''
         for j in xrange(ncols):
-            cell_text = '''<p align='center'><font face='Arial'>%s</font></p>''' % str(data.iloc[i, j])
+            cell_text = '''<font face='Arial'>%s</font>''' % str(data.iloc[i, j])
+            if i == 0:
+                cell_text = '''<strong>%s</strong>''' % cell_text
+            cell_text = '''<p align='center'>%s</p>''' % cell_text
             if cell_width is None:
-                cell = '''<td%s>%s
-                </td>''' % (cell_text, bg_text)
+                cell = '''<td %s>%s
+                </td>''' % (bg_text, cell_text)
             else:
-                cell = '''<td width=%.1f%s>%s
+                cell = '''<td width=%.1f %s>%s
                 </td>''' % (cell_width, bg_text, cell_text)
             line_text += cell
         line = '''<tr>%s
@@ -84,7 +87,7 @@ def get_table_html(table, inc_index=True, inc_columns=True, width=None):
         width_text = ''
     else:
         width_text = ''' width="%d" ''' % width
-    ans = '''<table border=0%s>%s
+    ans = '''<table border=0 cellspacing="0"%s>%s
     </table>''' % (width_text, ans)
     return ans
 
@@ -126,7 +129,7 @@ class Email(object):
             if height is not None:
                 scale_arg += ''' height='%d' ''' % height
             self.content += '''<img src='cid:%s'%s/><br>''' % (image, scale_arg)
-            self.image.append(image)
+            self.images.append(image)
         else:
             logger.warn('%s does not exist' % image)
     
@@ -168,7 +171,10 @@ class Email(object):
     def send_email(self):
         self.create_message()
         try:
-            server = smtplib.SMTP('localhost')
+            server = smtplib.SMTP('smtp.live.com:587')
+            server.ehlo()
+            server.starttls()
+            server.login(os.getenv('emailaddress'), os.getenv('emailpassword'))
             server.sendmail(self.from_address, self.to_addresses, self.msg.as_string())
             server.quit()
         except Exception as e:
