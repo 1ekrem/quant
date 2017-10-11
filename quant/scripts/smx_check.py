@@ -29,9 +29,9 @@ def plot_pnl(pnl17, pnl):
     return filename
 
 
-def run_smx_check():
+def run_smx_check(capital=500):
     stock_data = sm.get_stocks_data()
-    sig, sig_date = sm.run_smx_signal(stock_data)
+    sig, sig_date = sm.run_smx_signal(stock_data, capital=capital)
     table = np.round(sig.iloc[:30], 2)
     pnl17 = sm.run_portfolio(stock_data, *sm.P17)
     pnl = sm.run_portfolio(stock_data, *sm.PL)

@@ -25,6 +25,8 @@ def get_beta_cov(beta):
 def run_hedge():
     data = load_hedging_data()
     cov = get_beta_cov(data['beta'])
-    o = ou.GradientDescentOptimizer(data['instrument'], data['portfolio'], cov)
+    #o = ou.GradientDescentOptimizer(data['instrument'], data['portfolio'], cov)
+    o = ou.MeanVarianceOptimizer(instrument=data['instrument'], existing_stocks=data['portfolio'],
+                                 specific_covariance=cov)
     return o
 

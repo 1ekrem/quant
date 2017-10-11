@@ -22,7 +22,7 @@ def load_stock_returns(universe):
     return dict([(idx, tu.get_timeseries(stocks.DATABASE_NAME, stocks.STOCK_RETURNS, data_name=idx)) for idx in universe.index])
 
 
-def run_signal(stock_data, fast=7, slow=15):
+def run_signal(stock_data, fast=7, slow=15, capital=500):
     total_returns = pd.concat([pd.Series(v.Total, name=k) for k, v in stock_data.iteritems() if v is not None], axis=1)
     spec_returns = pd.concat([pd.Series(v.Residual, name=k) for k, v in stock_data.iteritems() if v is not None], axis=1)
     volatility = pd.concat([pd.Series(v.Vol, name=k) for k, v in stock_data.iteritems() if v is not None], axis=1)
@@ -31,7 +31,7 @@ def run_signal(stock_data, fast=7, slow=15):
     s = spec_returns.ewm(span=slow, axis=0).mean() / volatility
     f = spec_returns.ewm(span=fast, axis=0).mean() / volatility
     sig = s - f
-    ans = pd.concat([sig.iloc[-1], 1. / volatility.iloc[-1]], axis=1)
+    ans = pd.concat([sig.iloc[-1], capital / volatility.iloc[-1]], axis=1)
     ans.columns = ['Signal', 'Multiplier']
     return ans, sig.index[-1]
 
@@ -85,11 +85,11 @@ def run_smx(stock_data=None, years=[2007, 2014, 2015, 2016, 2017]):
         ans[year].to_csv('~/%d.csv' % year)
 
 
-def run_smx_signal(stock_data=None):
+def run_smx_signal(stock_data=None, capital=500.):
     if stock_data is None:
         stock_data = get_stocks_data()
-    sig, sig_date = run_signal(stock_data, *P17)
-    sig2, _ = run_signal(stock_data, *PL)
+    sig, sig_date = run_signal(stock_data, *P17, capital=capital)
+    sig2, _ = run_signal(stock_data, *PL, capital=capital)
     sig = pd.concat([sig, sig2], axis=1)
     sig.columns = ['Short', 'Multiplier', 'Long', 'M']
     sig = sig.loc[:, ['Short', 'Long', 'Multiplier']]
