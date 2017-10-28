@@ -93,7 +93,7 @@ def run_momentum_portfolio(stock_data, lag=1, lookback=26, top=20):
             cutoff = xx[-top] if len(xx) >= top else xx[0]
             return 1. * (x >= cutoff)
         else:
-            return xx
+            return x
     
     def normalize(x):
         xx = x.sum()
