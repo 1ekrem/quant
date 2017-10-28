@@ -59,32 +59,6 @@ def StumpError(x, y, c):
     return error / total if total > 0 and not np.isnan(c) else np.nan
 
 
-def DummyStump2(x, y):
-    '''
-    Stump estimation of a single iteration. 
-    Backup function
-    '''
-    data = pd.concat([x, y], axis=1).copy().values
-    data = data[np.argsort(x.values)]
-    tot = np.sum(np.abs(y))
-    if tot == 0.:
-        tot = 1.
-    pos = data[:, 1].copy() / tot
-    pos[pos < 0] = 0.
-    pos = np.cumsum(pos)
-    neg = data[:, 1].copy() / tot
-    neg[neg > 0] = 0.
-    neg = np.cumsum(neg[::-1])
-    neg = np.array(list(neg[:-1])[::-1] + [0.])
-    score = np.abs(pos - neg - 0.5)
-    loc = np.argsort(score)[-1]
-    cutoff = np.mean(data[loc:loc+2, 0]) if loc < len(data)-1 else 1. + data[-1, 0]
-    ploc = 1. * loc / len(data)
-    if ploc > .5:
-        ploc = 1. - ploc
-    return cutoff, ploc, 2. * np.max(score)
-
-
 def DummyStump(x, y):
     data_x = np.array(x).flatten()
     data_y = np.array(y).flatten()
@@ -353,4 +327,66 @@ class RandomBoostingComponent(object):
         self.model = self.core.model
         self.signal = self.core.signal
         self.normalized_signal = self.core.normalized_signal
+
+
+class StockComponent(object):
+    '''
+    Stock Strategy component
+    '''    
+    def __init__(self, asset_data, in_sample, out_of_sample, cols, model_function, 
+                 prediction_function, model=None, use_names=None, params=None, *args, **kwargs):
+        self.asset_data = asset_data
+        self.in_sample = in_sample
+        self.out_of_sample = out_of_sample
+        self.cols = cols
+        self.model_function = model_function
+        self.prediction_function = prediction_function
+        self.model = model
+        self.use_names = asset_data.keys() if use_names is None else use_names
+        self.params = {} if params is None else params
+        self.run_model()
+
+    def run_model(self):
+        self.prepare_data()
+        self.estimate_model()
+        self.calculate_signals()
+    
+    def prepare_data(self):
+        x = []
+        y = []
+        for k, v in self.asset_data.iteritems():
+            if k in self.use_names:
+                tmp = v.loc[self.in_sample]
+                tmp = tmp.loc[-tmp.Target.isnull()]
+                if not tmp.empty:
+                    x.append(tmp[self.cols])
+                    y.append(tmp['Target'])
+        x = pd.concat(x, axis=0)
+        y = pd.concat(y, axis=0)
+        self.medians = x.median(axis=0)
+        self._x = x.fillna(self.medians)
+        self._y = y.fillna(0.)
+
+    def estimate_model(self):
+        if self.model is None:
+            logger.info('Estimating model with %d observations' % len(self._x))
+            self.model = self.model_function(x=self._x, y=self._y, **self.params)
+    
+    def calculate_signals(self):
+        self.signal = {}
+        for k, v in self.asset_data.iteritems():
+            tmp = v.loc[self.out_of_sample, self.cols]
+            tmp = tmp.loc[(-tmp.isnull()).any(axis=1)]
+            if not tmp.empty:
+                tmp = tmp.fillna(self.medians)
+                self.signal[k] = self.prediction_function(x=tmp, ans=self.model)
+
+
+class StockRandomBoostingComponent(object):
+    def __init__(self, asset_data, in_sample, out_of_sample, cols, params=None, model=None, use_names=None):
+        self.core = StockComponent(asset_data, in_sample, out_of_sample, cols,
+                                   model_function=RandomBoosting, prediction_function=RandomBoostingPrediction,
+                                   params=params, model=model, use_names=use_names)
+        self.model = self.core.model
+        self.signal = self.core.signal
 

@@ -71,6 +71,10 @@ def download_stock_universe(universe):
             download_stock_prices(idx)
 
 
+def get_universe(universe):
+    return tu.get_description(DATABASE_NAME, STOCKS_DESCRIPTION, [universe])
+
+
 def load_stock_prices(stock_id, start_date=None, end_date=None):
     return tu.get_timeseries(DATABASE_NAME, STOCKS, index_range=(start_date, end_date), data_name=stock_id)
 
@@ -119,7 +123,7 @@ def calculate_beta_and_returns(rtns, lookback, min_obs):
 
 def calculate_universe_betas_and_returns(universe, index_ticker, start_date=None, lookback=52, min_obs=26):
     if isinstance(universe, str):
-        u = tu.get_description(DATABASE_NAME, STOCKS_DESCRIPTION, [universe])
+        u = get_universe(universe)
     else:
         u = universe
     if u is not None:
@@ -140,6 +144,17 @@ def calculate_universe_betas_and_returns(universe, index_ticker, start_date=None
                     ans = ans[['Beta', 'Total', 'Residual', 'Vol']]
                     if ans.Beta.first_valid_index() is not None:
                         tu.store_timeseries(ans[ans.Beta.first_valid_index():], DATABASE_NAME, STOCK_RETURNS, stock_id)
+
+
+def stock_returns_loader(stock_ids):
+    ans = {}
+    for idx in stock_ids:
+        r = tu.get_timeseries(DATABASE_NAME, STOCK_RETURNS, data_name=idx)
+        if r is not None:
+            r.loc[r.Total.abs() > .7, 'Residual'] = np.nan
+            r.loc[r.Total.abs() > .7, 'Total'] = np.nan
+            ans[idx] = r
+    return ans
 
 
 def import_smx_tickers():
