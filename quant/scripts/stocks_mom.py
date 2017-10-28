@@ -85,7 +85,7 @@ def run_momentum_portfolio(stock_data, lag=1, lookback=26, top=20):
     spec_returns[total_returns.abs() > .7] = np.nan
     total_returns[total_returns.abs() > .7] = np.nan
     r = spec_returns / volatility
-    sig = r.rolling(lookback, min_periods=3).shift(lag)
+    sig = r.rolling(lookback, min_periods=3).mean().shift(lag)
     
     def get_top(x):
         xx = np.sort(x.dropna().values)
