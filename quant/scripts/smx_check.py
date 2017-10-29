@@ -72,7 +72,7 @@ def run_smx_ml_check(capital=500):
 
 def main():
     run_smx_check()
-    run_smx_ml_check()
+    # run_smx_ml_check()
 
 
 if __name__ == '__main__':
