@@ -31,8 +31,8 @@ def run_signal(stock_data, fast=7, slow=15, capital=500):
     s = spec_returns.ewm(span=slow, axis=0).mean() / volatility
     f = spec_returns.ewm(span=fast, axis=0).mean() / volatility
     sig = s - f
-    ans = pd.concat([sig.iloc[-1], capital / volatility.iloc[-1]], axis=1)
-    ans.columns = ['Signal', 'Multiplier']
+    ans = pd.concat([sig.iloc[-1], capital / volatility.iloc[-1], total_returns.iloc[-1]], axis=1)
+    ans.columns = ['Signal', 'Multiplier', 'Returns']
     return ans, sig.index[-1]
 
 
@@ -44,8 +44,8 @@ def run_momentum_signal(stock_data, lag=1, lookback=26, capital=500):
     total_returns[total_returns.abs() > .7] = np.nan
     r = spec_returns / volatility
     sig = r.rolling(lookback, min_periods=3).mean().shift(lag)
-    ans = pd.concat([sig.iloc[-1], capital / volatility.iloc[-1]], axis=1)
-    ans.columns = ['Signal', 'Multiplier']
+    ans = pd.concat([sig.iloc[-1], capital / volatility.iloc[-1], total_returns.iloc[-1]], axis=1)
+    ans.columns = ['Signal', 'Multiplier', 'Returns']
     return ans, sig.index[-1]
 
 
@@ -136,8 +136,8 @@ def run_smx_signal(stock_data=None, capital=500.):
     sig2, _ = run_signal(stock_data, *PL, capital=capital)
     sig3, _ = run_momentum_signal(stock_data, capital=capital)
     sig = pd.concat([sig, sig2, sig3], axis=1)
-    sig.columns = ['Short', 'Multiplier', 'Long', 'M', 'Momentum', 'M2']
-    sig = sig.loc[:, ['Short', 'Long', 'Momentum', 'Multiplier']]
+    sig.columns = ['Short', 'Multiplier', 'Returns', 'Long', 'M', 'R', 'Momentum', 'M2', 'R2']
+    sig = sig.loc[:, ['Short', 'Long', 'Momentum', 'Multiplier', 'Returns']]
     sig = sig.sort_values('Short', ascending=False)
     return sig, sig_date
 

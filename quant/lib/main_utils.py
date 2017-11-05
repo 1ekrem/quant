@@ -9,6 +9,7 @@ import smtplib
 import cPickle as pickle
 import pandas as pd
 from email.mime.multipart import MIMEMultipart
+from email.mime.application import MIMEApplication
 from email.mime.base import MIMEBase
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
@@ -162,10 +163,12 @@ class Email(object):
                 self.msg.attach(img)
         if len(self.attachments) > 0:
             for f in self.attachments:
-                part = MIMEBase('application', 'octet-stream')
-                part.set_payload(open(f, 'rb').read())
-                encoders.encode_base64(part)
-                part.add_header('Content-Disposition', "attachment: filename='{0}'".format(os.path.basename(f)))
+                with open(f, "rb") as fil:
+                    part = MIMEApplication(
+                        fil.read(),
+                        Name=os.path.basename(f)
+                    )
+                part['Content-Disposition'] = 'attachment; filename="%s"' % os.path.basename(f)
                 self.msg.attach(part)
     
     def send_email(self):

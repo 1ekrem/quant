@@ -34,6 +34,8 @@ def plot_pnl(pnl17, pnl, pnl_mom):
 def run_smx_check(capital=500):
     stock_data = sm.get_stocks_data()
     sig, sig_date = sm.run_smx_signal(stock_data, capital=capital)
+    fname = os.path.expanduser('~/signal.csv')
+    sig.to_csv(fname)
     table = np.round(sig.iloc[:30], 2)
     pnl17 = sm.run_portfolio(stock_data, *sm.P17)
     pnl = sm.run_portfolio(stock_data, *sm.PL)
@@ -49,6 +51,7 @@ def run_smx_check(capital=500):
     mail.add_table(table2)
     mail.add_text('Stocks signal as of %s' % sig_date.strftime('%B %d, %Y'), bold=True)
     mail.add_table(table)
+    mail.add_attachment(fname)
     mail.send_email()
 
 
