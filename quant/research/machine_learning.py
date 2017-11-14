@@ -91,7 +91,7 @@ class StocksSim(object):
         logger.info('Loading stock returns')
         self.stock_returns = stocks.stock_returns_loader(self.u.index)
     
-    def create_estimation_data(self, depth):
+    def create_estimation_data(self, depth, universe=None):
         ans = {}
         cols = ['H%d' % i for i in xrange(depth)]
         for ticker in self.u.index:

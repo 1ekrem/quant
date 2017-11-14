@@ -102,8 +102,7 @@ def estimate_boosting_stump(x, y, estimate_intercept=True):
         pred = x.iloc[:, 0]
         e = StumpError(pred, y * alpha, np.min(pred))
         w = get_weight_from_error(e)
-        alpha[y < 0] *= np.exp(w)
-        alpha[y > 0] *= np.exp(-w)
+        alpha *= 1. * (y < 0) * np.exp(w) + 1. * (y > 0) * np.exp(-w)
         alpha /= np.sum(alpha)
         ans.append([BOOSTING_INTERCEPT, y.name, np.nan, e, w, np.nan, np.nan])
     for i in np.arange(np.size(x, 1)):
@@ -111,10 +110,11 @@ def estimate_boosting_stump(x, y, estimate_intercept=True):
         u, ploc, score = DummyStump(pred, y * alpha)
         e = StumpError(pred, y * alpha, u)
         w = get_weight_from_error(e)
-        alpha[(pred < u) & (y > 0)] *= np.exp(w)
-        alpha[(pred > u) & (y < 0)] *= np.exp(w)
-        alpha[(pred < u) & (y < 0)] *= np.exp(-w)
-        alpha[(pred > u) & (y > 0)] *= np.exp(-w)
+        alpha_delta = 1. * (pred < u) * (y > 0) * np.exp(w)
+        alpha_delta += 1. * (pred > u) * (y < 0) * np.exp(w)
+        alpha_delta += 1. * (pred < u) * (y < 0) * np.exp(-w)
+        alpha_delta += 1. * (pred > u) * (y > 0) * np.exp(-w)
+        alpha *= alpha_delta
         alpha /= np.sum(alpha)
         ans.append([pred.name, y.name, u, e, w, ploc, score])
     return pd.DataFrame(ans, columns=['predicative', 'target', 'estimation', 'Error', 'weight', 'pLoc', 'score'])
@@ -188,7 +188,7 @@ def RandomBoosting(x, y, forest_size=100, estimate_intercept=True, no_of_variabl
     '''
     myx, _ = give_me_pandas_variables(x, y)
     sequence = get_random_sequence(np.size(myx, 1), forest_size)
-    return [(seq, BoostingStump(x.iloc[:, seq], y, estimate_intercept, no_of_variables)) for seq in sequence]
+    return [(seq, BoostingStump(myx.iloc[:, seq], y, estimate_intercept, no_of_variables)) for seq in sequence]
     
 
 # Prediction
