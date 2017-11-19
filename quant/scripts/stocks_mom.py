@@ -24,7 +24,14 @@ def load_stock_returns(universe):
 
 def run_signal(stock_data, fast=7, slow=15, capital=500):
     total_returns = pd.concat([pd.Series(v.Total, name=k) for k, v in stock_data.iteritems() if v is not None], axis=1)
-    volatility = pd.concat([pd.Series(v.Vol, name=k) for k, v in stock_data.iteritems() if v is not None], axis=1)
+    volatility = []
+    for k, v in stock_data.iteritems():
+        if v is not None:
+            if 'Vol' in v.columns:
+                tmp = v.Vol
+                tmp.name = k
+                volatility.append(tmp)
+    volatility = pd.concat(volatility, axis=1)
     total_returns[total_returns.abs() > .7] = np.nan
     s = total_returns.ewm(span=slow, axis=0).mean() / volatility
     f = total_returns.ewm(span=fast, axis=0).mean() / volatility
@@ -36,7 +43,14 @@ def run_signal(stock_data, fast=7, slow=15, capital=500):
 
 def run_momentum_signal(stock_data, lag=1, lookback=26, capital=500):
     total_returns = pd.concat([pd.Series(v.Total, name=k) for k, v in stock_data.iteritems() if v is not None], axis=1)
-    volatility = pd.concat([pd.Series(v.Vol, name=k) for k, v in stock_data.iteritems() if v is not None], axis=1)
+    volatility = []
+    for k, v in stock_data.iteritems():
+        if v is not None:
+            if 'Vol' in v.columns:
+                tmp = v.Vol
+                tmp.name = k
+                volatility.append(tmp)
+    volatility = pd.concat(volatility, axis=1)
     total_returns[total_returns.abs() > .7] = np.nan
     r = total_returns / volatility
     sig = r.rolling(lookback, min_periods=3).mean().shift(lag)
@@ -84,7 +98,14 @@ def run_portfolio(stock_data, fast=3, slow=10, top=20):
 
 def run_momentum_portfolio(stock_data, lag=1, lookback=26, top=20):
     total_returns = pd.concat([pd.Series(v.Total, name=k) for k, v in stock_data.iteritems() if v is not None], axis=1)
-    volatility = pd.concat([pd.Series(v.Vol, name=k) for k, v in stock_data.iteritems() if v is not None], axis=1)
+    volatility = []
+    for k, v in stock_data.iteritems():
+        if v is not None:
+            if 'Vol' in v.columns:
+                tmp = v.Vol
+                tmp.name = k
+                volatility.append(tmp)
+    volatility = pd.concat(volatility, axis=1)
     total_returns[total_returns.abs() > .7] = np.nan
     r = total_returns / volatility
     sig = r.rolling(lookback, min_periods=3).mean().shift(lag)
