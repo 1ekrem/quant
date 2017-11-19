@@ -5,6 +5,7 @@ Created on 23 Jun 2017
 '''
 import numpy as np
 import pandas as pd
+from scipy import stats as ss
 from quant.lib import timeseries_utils as tu
 from quant.lib.main_utils import logger
 
@@ -32,6 +33,17 @@ def give_me_pandas_variables(x, y):
     
     assert len(x) == len(y)
     return myx.fillna(0.), myy.fillna(0.)
+
+
+def data_to_score(data, mean=None, sd=None):
+    ans = data.copy()
+    d = data[-np.isnan(data)]
+    if mean is None:
+        mean = np.mean(d)
+    if sd is None:
+        sd = np.std(d)
+    ans[-np.isnan(ans)] = ss.norm.cdf(ans.values, loc=mean, scale=sd)
+    return 2. * (ans - .5)
 
 
 # Boosting

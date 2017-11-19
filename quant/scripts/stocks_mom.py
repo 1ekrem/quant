@@ -10,8 +10,8 @@ from quant.lib import timeseries_utils as tu, portfolio_utils as pu
 from quant.data import stocks
 from datetime import datetime as dt
 
-PL = (2, 15)
-P17 = (10, 46)
+PL = (3, 14)
+P17 = (6, 13)
 
 
 def get_universe(universe):
@@ -24,12 +24,10 @@ def load_stock_returns(universe):
 
 def run_signal(stock_data, fast=7, slow=15, capital=500):
     total_returns = pd.concat([pd.Series(v.Total, name=k) for k, v in stock_data.iteritems() if v is not None], axis=1)
-    spec_returns = pd.concat([pd.Series(v.Residual, name=k) for k, v in stock_data.iteritems() if v is not None], axis=1)
     volatility = pd.concat([pd.Series(v.Vol, name=k) for k, v in stock_data.iteritems() if v is not None], axis=1)
-    spec_returns[total_returns.abs() > .7] = np.nan
     total_returns[total_returns.abs() > .7] = np.nan
-    s = spec_returns.ewm(span=slow, axis=0).mean() / volatility
-    f = spec_returns.ewm(span=fast, axis=0).mean() / volatility
+    s = total_returns.ewm(span=slow, axis=0).mean() / volatility
+    f = total_returns.ewm(span=fast, axis=0).mean() / volatility
     sig = s - f
     ans = pd.concat([sig.iloc[-1], capital / volatility.iloc[-1], total_returns.iloc[-1]], axis=1)
     ans.columns = ['Signal', 'Multiplier', 'Returns']
@@ -38,11 +36,9 @@ def run_signal(stock_data, fast=7, slow=15, capital=500):
 
 def run_momentum_signal(stock_data, lag=1, lookback=26, capital=500):
     total_returns = pd.concat([pd.Series(v.Total, name=k) for k, v in stock_data.iteritems() if v is not None], axis=1)
-    spec_returns = pd.concat([pd.Series(v.Residual, name=k) for k, v in stock_data.iteritems() if v is not None], axis=1)
     volatility = pd.concat([pd.Series(v.Vol, name=k) for k, v in stock_data.iteritems() if v is not None], axis=1)
-    spec_returns[total_returns.abs() > .7] = np.nan
     total_returns[total_returns.abs() > .7] = np.nan
-    r = spec_returns / volatility
+    r = total_returns / volatility
     sig = r.rolling(lookback, min_periods=3).mean().shift(lag)
     ans = pd.concat([sig.iloc[-1], capital / volatility.iloc[-1], total_returns.iloc[-1]], axis=1)
     ans.columns = ['Signal', 'Multiplier', 'Returns']
@@ -51,17 +47,25 @@ def run_momentum_signal(stock_data, lag=1, lookback=26, capital=500):
 
 def run_portfolio(stock_data, fast=3, slow=10, top=20):
     total_returns = pd.concat([pd.Series(v.Total, name=k) for k, v in stock_data.iteritems() if v is not None], axis=1)
-    spec_returns = pd.concat([pd.Series(v.Residual, name=k) for k, v in stock_data.iteritems() if v is not None], axis=1)
-    volatility = pd.concat([pd.Series(v.Vol, name=k) for k, v in stock_data.iteritems() if v is not None], axis=1)
-    spec_returns[total_returns.abs() > .7] = np.nan
+    volatility = []
+    for k, v in stock_data.iteritems():
+        if v is not None:
+            if 'Vol' in v.columns:
+                tmp = v.Vol
+                tmp.name = k
+                volatility.append(tmp)
+    volatility = pd.concat(volatility, axis=1)
     total_returns[total_returns.abs() > .7] = np.nan
-    s = spec_returns.ewm(span=slow, axis=0).mean() / volatility
-    f = spec_returns.ewm(span=fast, axis=0).mean() / volatility
+    s = total_returns.ewm(span=slow, axis=0).mean() / volatility
+    f = total_returns.ewm(span=fast, axis=0).mean() / volatility
     sig = s - f
     
     def get_top(x):
         xx = np.sort(x.dropna().values)
-        cutoff = xx[-top] if len(xx) >= top else xx[0]
+        if len(xx) > 0:
+            cutoff = xx[-top] if len(xx) >= top else xx[0]
+        else:
+            cutoff = 0.
         return 1. * (x >= cutoff)
     
     def normalize(x):
@@ -80,11 +84,9 @@ def run_portfolio(stock_data, fast=3, slow=10, top=20):
 
 def run_momentum_portfolio(stock_data, lag=1, lookback=26, top=20):
     total_returns = pd.concat([pd.Series(v.Total, name=k) for k, v in stock_data.iteritems() if v is not None], axis=1)
-    spec_returns = pd.concat([pd.Series(v.Residual, name=k) for k, v in stock_data.iteritems() if v is not None], axis=1)
     volatility = pd.concat([pd.Series(v.Vol, name=k) for k, v in stock_data.iteritems() if v is not None], axis=1)
-    spec_returns[total_returns.abs() > .7] = np.nan
     total_returns[total_returns.abs() > .7] = np.nan
-    r = spec_returns / volatility
+    r = total_returns / volatility
     sig = r.rolling(lookback, min_periods=3).mean().shift(lag)
     
     def get_top(x):

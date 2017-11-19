@@ -100,6 +100,7 @@ class StocksSim(object):
                 res = data.Residual
                 vol = data.Vol
                 t = res.rolling(self.forecast_horizon).sum().shift(-self.forecast_horizon) / vol
+                t = mu.data_to_score(t, mean=0, sd=1.)
                 a = res / vol
                 h = pd.concat([t] + [a.diff(i+1) for i in xrange(depth)], axis=1)
                 h.columns = ['Target'] + cols

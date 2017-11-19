@@ -121,29 +121,24 @@ def calculate_beta_and_returns(rtns, lookback, min_obs):
         return None
     
 
-def calculate_universe_betas_and_returns(universe, index_ticker, start_date=None, lookback=52, min_obs=26):
+def calculate_universe_returns(universe, lookback=52, min_obs=13):
     if isinstance(universe, str):
         u = get_universe(universe)
     else:
         u = universe
     if u is not None:
-        idx = load_stock_index(index_ticker)
         for stock_id in u.index:
             stock = load_stock_prices(stock_id)
             if stock is not None:
-                logger.info('Calculating betas and returns - %s' % stock_id)
+                logger.info('Calculating returns - %s' % stock_id)
                 stock = stock['Price']
                 stock = stock.ffill(limit=5)
-                rtns = pd.concat([idx.resample('W').last(), stock.resample('W').last()], axis=1)
+                rtns = stock.resample('W').last()
                 rtns = rtns.diff() / rtns.shift()
-                rtns.columns = ['Index', 'Total']
-                if start_date is not None:
-                    rtns = rtns[start_date:]
-                ans = calculate_beta_and_returns(rtns, lookback, min_obs)
-                if ans is not None:
-                    ans = ans[['Beta', 'Total', 'Residual', 'Vol']]
-                    if ans.Beta.first_valid_index() is not None:
-                        tu.store_timeseries(ans[ans.Beta.first_valid_index():], DATABASE_NAME, STOCK_RETURNS, stock_id)
+                vol = rtns.rolling(lookback, min_periods=min_obs).std()
+                ans = pd.concat([rtns, vol], axis=1)
+                ans.columns = ['Total', 'Vol']
+                tu.store_timeseries(ans, DATABASE_NAME, STOCK_RETURNS, stock_id)
 
 
 def stock_returns_loader(stock_ids):
@@ -151,7 +146,6 @@ def stock_returns_loader(stock_ids):
     for idx in stock_ids:
         r = tu.get_timeseries(DATABASE_NAME, STOCK_RETURNS, data_name=idx)
         if r is not None:
-            r.loc[r.Total.abs() > .7, 'Residual'] = np.nan
             r.loc[r.Total.abs() > .7, 'Total'] = np.nan
             ans[idx] = r
     return ans
@@ -165,13 +159,13 @@ def download_smx_prices():
     download_stock_universe('SMX Index')
 
 
-def calculate_smx_betas_and_returns(start_date=dt.today() - timedelta(380)):
-    calculate_universe_betas_and_returns('SMX Index', 'UKX Index', start_date)
+def calculate_smx_returns():
+    calculate_universe_returns('SMX Index')
 
 
 def main():
     download_smx_prices()
-    calculate_smx_betas_and_returns()
+    calculate_smx_returns()
 
 
 if __name__ == '__main__':
