@@ -32,14 +32,14 @@ def plot_pnl(pnl17, pnl, pnl_mom):
 
 
 def run_smx_check(capital=500):
-    stock_data = sm.get_stocks_data()
-    sig, sig_date = sm.run_smx_signal(stock_data, capital=capital)
+    r, v = sm.get_smx_data()
+    sig, sig_date = sm.run_smx_signal(r, v, capital=capital)
     fname = os.path.expanduser('~/signal.csv')
     sig.to_csv(fname)
     table = np.round(sig.iloc[:30], 2)
-    pnl17 = sm.run_portfolio(stock_data, *sm.P17)
-    pnl = sm.run_portfolio(stock_data, *sm.PL)
-    pnl_mom = sm.run_momentum_portfolio(stock_data)
+    pnl17 = sm.run_portfolio(r, v, *sm.P17)
+    pnl = sm.run_portfolio(r, v, *sm.PL)
+    pnl_mom = sm.run_momentum_portfolio(r, v)
     table2 = np.round(100. * pd.concat([pnl17, pnl, pnl_mom], axis=1).iloc[-6:], 2)
     table2.columns = ['Short PnL (%)', 'Long PnL (%)', 'Momentum PnL (%)']
     table2.index = [x.strftime('%Y-%m-%d') for x in table2.index]

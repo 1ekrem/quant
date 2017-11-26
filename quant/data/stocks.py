@@ -4,10 +4,8 @@ Created on 18 Sep 2017
 @author: wayne
 '''
 import os
-import time
 import numpy as np
 import pandas as pd
-from datetime import datetime as dt, timedelta
 from quant.lib import data_utils as du, timeseries_utils as tu
 from quant.lib.main_utils import logger
 from quant.data import quandldata
@@ -61,22 +59,28 @@ def download_stock_prices(stock_id):
     logger.info('Downloading stock prices - %s' % stock_id)
     data = load_quandl_stock_prices(stock_id)
     if data is not None:
-        tu.store_timeseries(data, DATABASE_NAME, STOCKS, stock_id)
-
-
-def download_stock_universe(universe):
-    u = tu.get_description(DATABASE_NAME, STOCKS_DESCRIPTION, [universe])
-    if u is not None:
-        for idx in u.index:
-            download_stock_prices(idx)
+        for c in data.columns:
+            tmp = data[c].to_frame()
+            tmp.columns = [stock_id]
+            tu.store_timeseries(tmp, DATABASE_NAME, STOCKS, c)
 
 
 def get_universe(universe):
     return tu.get_description(DATABASE_NAME, STOCKS_DESCRIPTION, [universe])
 
 
-def load_stock_prices(stock_id, start_date=None, end_date=None):
-    return tu.get_timeseries(DATABASE_NAME, STOCKS, index_range=(start_date, end_date), data_name=stock_id)
+def load_stock_prices(start_date=None, end_date=None):
+    if start_date is None and end_date is None:
+        return tu.get_timeseries(DATABASE_NAME, STOCKS, data_name='Last Close')
+    else:
+        return tu.get_timeseries(DATABASE_NAME, STOCKS, index_range=(start_date, end_date), data_name='Last Close')
+
+
+def load_stock_returns(start_date=None, end_date=None, data_name='Returns'):
+    if start_date is None and end_date is None:
+        return tu.get_timeseries(DATABASE_NAME, STOCK_RETURNS, data_name=data_name)
+    else:
+        return tu.get_timeseries(DATABASE_NAME, STOCK_RETURNS, index_range=(start_date, end_date), data_name=data_name)
 
 
 def load_stock_index(ticker):
@@ -95,52 +99,6 @@ def load_stock_index(ticker):
         return None
 
 
-def calculate_beta_and_returns(rtns, lookback, min_obs):
-    if len(rtns) >= lookback:
-        rtns['Beta'] = np.nan
-        rtns['Residual'] = np.nan
-        rtns['Vol'] = np.nan
-        rtns = rtns[['Index', 'Total', 'Beta', 'Residual', 'Vol']]
-        for i in xrange(min_obs, len(rtns)+1):
-            r = rtns.iloc[i-lookback:i, :2].dropna()
-            if len(r) >= min_obs:
-                tails = np.int(.1 * len(r))
-                data = np.array(zip(r.values[:, 0], r.values[:, 1]), dtype=[('x', np.float64), ('y', np.float64)])
-                data = np.sort(data, order='y')
-                m = np.vstack([data['x'][tails:len(r)-tails], data['y'][tails:len(r)-tails]]).T
-                m = m - np.mean(m, axis=0)
-                b = np.dot(m.T, m)
-                v = np.sqrt(52. * b[0, 0] / len(m))
-                b = b[0, 1] / b[0, 0]
-                idx = rtns.index[i-1]
-                rtns.loc[idx, 'Beta'] = b
-                rtns.loc[idx, 'Vol'] = v
-                rtns.loc[idx, 'Residual'] = rtns.loc[idx, 'Total'] - rtns.loc[idx, 'Index'] * b
-        return rtns
-    else:
-        return None
-    
-
-def calculate_universe_returns(universe, lookback=52, min_obs=13):
-    if isinstance(universe, str):
-        u = get_universe(universe)
-    else:
-        u = universe
-    if u is not None:
-        for stock_id in u.index:
-            stock = load_stock_prices(stock_id)
-            if stock is not None:
-                logger.info('Calculating returns - %s' % stock_id)
-                stock = stock['Price']
-                stock = stock.ffill(limit=5)
-                rtns = stock.resample('W').last()
-                rtns = rtns.diff() / rtns.shift()
-                vol = rtns.rolling(lookback, min_periods=min_obs).std()
-                ans = pd.concat([rtns, vol], axis=1)
-                ans.columns = ['Total', 'Vol']
-                tu.store_timeseries(ans, DATABASE_NAME, STOCK_RETURNS, stock_id)
-
-
 def stock_returns_loader(stock_ids):
     ans = {}
     for idx in stock_ids:
@@ -155,17 +113,40 @@ def import_smx_tickers():
     import_tickers('smx', 'SMX Index')
 
 
+def get_smx_universe():
+    u = tu.get_description(DATABASE_NAME, STOCKS_DESCRIPTION, ['SMX Index'])
+    idx = []
+    for y, x in u.iloc[:, 0].to_dict().iteritems():
+        if 'TRUST' not in x and 'FUND' not in x and 'BLACKROCK' not in x and 'FIDELITY' not in x \
+        and 'ABERDEEN' not in x and 'ALPHA' not in x and 'BARING' not in x and 'BH ' not in x \
+        and 'BAILLIE' not in x and 'F&C' not in x and 'INV TR' not in x and 'HENDERSON' not in x \
+        and 'JPMORGAN' not in x and 'MONTANARO' not in x and 'POLAR' not in x and 'SCHRODER' not in x \
+        and 'STANDARD LIFE' not in x and 'INCOME' not in x:
+            idx.append(y)
+    return u.loc[idx]
+    
+    
 def download_smx_prices():
-    download_stock_universe('SMX Index')
+    u = get_smx_universe()
+    for idx in u.index:
+        download_stock_prices(idx)
 
 
-def calculate_smx_returns():
-    calculate_universe_returns('SMX Index')
+def calculate_stock_returns():
+    u = get_smx_universe()
+    p = tu.get_timeseries(DATABASE_NAME, STOCKS, data_name='Last Close')    
+    p = p.ffill(limit=5)
+    rtns = p.resample('W').last()
+    rtns = rtns.diff() / rtns.shift()
+    r = rtns.abs()
+    vol = r[r>0].rolling(52, min_periods=13).median() * np.sqrt(52.)
+    tu.store_timeseries(rtns, DATABASE_NAME, STOCK_RETURNS, 'Returns')
+    tu.store_timeseries(vol, DATABASE_NAME, STOCK_RETURNS, 'Volatility')
 
 
 def main():
     download_smx_prices()
-    calculate_smx_returns()
+    calculate_stock_returns()
 
 
 if __name__ == '__main__':
