@@ -6,7 +6,7 @@ Created on 18 Sep 2017
 import os
 import numpy as np
 import pandas as pd
-from quant.lib import data_utils as du, timeseries_utils as tu
+from quant.lib import data_utils as du, timeseries_utils as tu, portfolio_utils as pu
 from quant.lib.main_utils import logger
 from quant.data import quandldata
 
@@ -121,7 +121,9 @@ def get_smx_universe():
         and 'ABERDEEN' not in x and 'ALPHA' not in x and 'BARING' not in x and 'BH ' not in x \
         and 'BAILLIE' not in x and 'F&C' not in x and 'INV TR' not in x and 'HENDERSON' not in x \
         and 'JPMORGAN' not in x and 'MONTANARO' not in x and 'POLAR' not in x and 'SCHRODER' not in x \
-        and 'STANDARD LIFE' not in x and 'INCOME' not in x:
+        and 'STANDARD LIFE' not in x and 'INCOME' not in x and 'IMPAX' not in x and 'VINACAPITAL' not in x \
+        and 'HIGHBRIDGE' not in x and 'EDISTON' not in x and 'PRIVATE EQUITY' not in x and 'ECOFIN' not in x \
+        and 'MARTIN' not in x and 'INVESCO' not in x and 'TWENTYFOUR' not in x and 'REAL ESTATE' not in x:
             idx.append(y)
     return u.loc[idx]
     
@@ -139,7 +141,7 @@ def calculate_stock_returns():
     rtns = p.resample('W').last()
     rtns = rtns.diff() / rtns.shift()
     r = rtns.abs()
-    vol = r[r>0].rolling(52, min_periods=13).median() * np.sqrt(52.)
+    vol = r[r>0].rolling(26, min_periods=8).median() * np.sqrt(52.)
     tu.store_timeseries(rtns, DATABASE_NAME, STOCK_RETURNS, 'Returns')
     tu.store_timeseries(vol, DATABASE_NAME, STOCK_RETURNS, 'Volatility')
 
