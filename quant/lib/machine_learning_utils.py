@@ -86,10 +86,9 @@ def DummyStump(x, y):
     neg[neg > 0.] = 0.
     neg = np.append(np.cumsum(neg[::-1])[:-1][::-1], 0.)
     score = np.abs(pos - neg - 0.5)
-    cutoff = np.append(.5 * (data['x'][:-1] + data['x'][1:]), data['x'][-1] + 1.)
     loc = np.arange(len(data_x))
-    loc = loc[score == np.max(score)][-1]
-    cutoff = cutoff[loc]
+    loc = loc[score == np.max(score)][0]
+    cutoff = data['x'][loc] if loc > 0 else np.nan
     ploc = loc / len(data_x)
     if ploc > .5:
         ploc = 1. - ploc
@@ -114,7 +113,7 @@ def estimate_boosting_stump(x, y, estimate_intercept=True):
         pred = x.iloc[:, 0]
         e = StumpError(pred, y * alpha, np.min(pred))
         w = get_weight_from_error(e)
-        alpha *= 1. * (y < 0) * np.exp(w) + 1. * (y > 0) * np.exp(-w)
+        alpha *= 1. * (y < 0) * np.exp(w) + 1. * (y >= 0) * np.exp(-w)
         alpha /= np.sum(alpha)
         ans.append([BOOSTING_INTERCEPT, y.name, np.nan, e, w, np.nan, np.nan])
     for i in np.arange(np.size(x, 1)):
@@ -122,10 +121,10 @@ def estimate_boosting_stump(x, y, estimate_intercept=True):
         u, ploc, score = DummyStump(pred, y * alpha)
         e = StumpError(pred, y * alpha, u)
         w = get_weight_from_error(e)
-        alpha_delta = 1. * (pred < u) * (y > 0) * np.exp(w)
-        alpha_delta += 1. * (pred > u) * (y < 0) * np.exp(w)
+        alpha_delta = 1. * (pred < u) * (y >= 0) * np.exp(w)
+        alpha_delta += 1. * (pred >= u) * (y < 0) * np.exp(w)
         alpha_delta += 1. * (pred < u) * (y < 0) * np.exp(-w)
-        alpha_delta += 1. * (pred > u) * (y > 0) * np.exp(-w)
+        alpha_delta += 1. * (pred >= u) * (y >= 0) * np.exp(-w)
         alpha *= alpha_delta
         alpha /= np.sum(alpha)
         ans.append([pred.name, y.name, u, e, w, ploc, score])
@@ -218,7 +217,8 @@ def StumpPrediction(x, c):
     Predict 1 if x >=c else -1
 
     '''
-    return 2. * (x >= c) - 1.
+    cc = np.min(x) - 1. if np.isnan(c) else c
+    return 2. * (x >= cc) - 1.
 
 
 def BoostingPrediction(x, ans):

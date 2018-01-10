@@ -15,7 +15,7 @@ from quant.lib.main_utils import MODEL_PATH
 DATABASE_NAME = 'quant'
 STRATEGY_TABLE = 'strategies'
 START_DATE = dt(2000, 1, 1)
-SAMLE_DATE = dt(2017, 1, 1)
+SAMLE_DATE = dt(2018, 1, 1)
 DATA_FREQUENCY = 'M'
 FORECAST_HORIZON = 1
 

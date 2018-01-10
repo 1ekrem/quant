@@ -123,7 +123,9 @@ def get_smx_universe():
         and 'JPMORGAN' not in x and 'MONTANARO' not in x and 'POLAR' not in x and 'SCHRODER' not in x \
         and 'STANDARD LIFE' not in x and 'INCOME' not in x and 'IMPAX' not in x and 'VINACAPITAL' not in x \
         and 'HIGHBRIDGE' not in x and 'EDISTON' not in x and 'PRIVATE EQUITY' not in x and 'ECOFIN' not in x \
-        and 'MARTIN' not in x and 'INVESCO' not in x and 'TWENTYFOUR' not in x and 'REAL ESTATE' not in x:
+        and 'MARTIN' not in x and 'INVESCO' not in x and 'TWENTYFOUR' not in x and 'REAL ESTATE' not in x \
+        and 'DUNEDIN' not in x and 'JUPITER' not in x and 'BBGI' not in x and 'REIT' not in x \
+        and 'WITAN' not in x and 'DEBENTURE' not in x:
             idx.append(y)
     return u.loc[idx]
     

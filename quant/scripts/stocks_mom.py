@@ -9,90 +9,56 @@ from quant.lib import portfolio_utils as pu
 from quant.data import stocks
 from datetime import datetime as dt
 
-PL = (4, 15)
-P17 = (9, 45)
+
+def get_top_3(x):
+    ans = np.nan * x
+    s = np.argsort(x[-x.isnull()])
+    if len(s) > 3:
+        s = s[-3:]
+    ans.loc[x[-x.isnull()].iloc[s].index] = 1.
+    return ans
 
 
-def run_signal(rtns, vol, fast=7, slow=15, capital=500):
-    total_returns = rtns.copy()
-    volatility = vol.copy()
-    total_returns[total_returns.abs() > .7] = np.nan
-    s = total_returns.ewm(span=slow, axis=0).mean() / volatility
-    f = total_returns.ewm(span=fast, axis=0).mean() / volatility
-    sig = s - f
-    ans = pd.concat([sig.iloc[-1], capital / volatility.iloc[-1], total_returns.iloc[-1]], axis=1)
-    ans.columns = ['Signal', 'Multiplier', 'Returns']
-    return ans, sig.index[-1]
+def get_clean_returns(rtns):
+    r = rtns.copy()
+    r[r.abs() > .7] = np.nan
+    return r
 
 
-def run_momentum_signal(rtns, vol, lag=1, lookback=26, capital=500):
-    total_returns = rtns.copy()
-    volatility = vol.copy()
-    total_returns[total_returns.abs() > .7] = np.nan
-    r = total_returns / volatility
-    sig = r.rolling(lookback, min_periods=3).mean().shift(lag)
-    ans = pd.concat([sig.iloc[-1], capital / volatility.iloc[-1], total_returns.iloc[-1]], axis=1)
-    ans.columns = ['Signal', 'Multiplier', 'Returns']
-    return ans, sig.index[-1]
+def get_momentum(rtns, vol, mom):
+    return np.sqrt(52.) * (rtns.rolling(mom, min_periods=1).mean() / vol)
 
 
-def run_portfolio(r, v, fast=3, slow=10, top=20):
-    total_returns = r.copy()
-    volatility = v.copy()
-    total_returns[total_returns.abs() > .7] = np.nan
-    s = total_returns.ewm(span=slow, axis=0).mean() / volatility
-    f = total_returns.ewm(span=fast, axis=0).mean() / volatility
-    sig = s - f
+def get_signal_1(rtns, vol):
+    '''
+    Momentum
+    '''
+    s1 = get_momentum(rtns, vol, 3)
+    s2 = get_momentum(rtns, vol, 26).shift(3)
+    s3 = get_momentum(rtns, vol, 52).shift(3)
+    sig = s3 + s2 - s1
+    return sig[(s1 > -3) & (s2 > 0) & (s3 > 0)].apply(get_top_3, axis=1)
+
+
+def get_signal_2(rtns, vol):
+    '''
+    Recovery
+    '''
+    s1 = get_momentum(rtns, vol, 3)
+    s2 = get_momentum(rtns, vol, 26).shift(3)
+    s3 = get_momentum(rtns, vol, 52).shift(3)
+    sig = s3 + s2 - s1
+    return sig[s1 > s2].apply(get_top_3, axis=1)
+
+
+def get_pnl(sig, rtns, vol):
+    pos = (1. / vol)[sig > 0].ffill(limit=4)
+    return get_clean_returns(rtns).mul(pos.shift()).sum(axis=1)
     
-    def get_top(x):
-        xx = np.sort(x.dropna().values)
-        if len(xx) > 0:
-            cutoff = xx[-top] if len(xx) >= top else xx[0]
-        else:
-            cutoff = 0.
-        return 1. * (x >= cutoff)
-    
-    def normalize(x):
-        xx = x.sum()
-        return x / xx if xx > 0 else x * np.nan
 
-    pos = sig.apply(get_top, axis=1)
-    weight = volatility.copy()
-    weight[weight <= 0.05] = 0.05
-    pos *= 1 / weight
-    pos = pos.apply(normalize, axis=1)
-    rtn = pos.shift() * total_returns
-    pnl = rtn.sum(axis=1)
-    return pnl
-
-
-def run_momentum_portfolio(rtns, vol, lag=1, lookback=26, top=20):
-    total_returns = rtns.copy()
-    volatility = vol.copy()
-    total_returns[total_returns.abs() > .7] = np.nan
-    r = total_returns / volatility
-    sig = r.rolling(lookback, min_periods=3).mean().shift(lag)
-    
-    def get_top(x):
-        xx = np.sort(x.dropna().values)
-        if len(xx) > 0:
-            cutoff = xx[-top] if len(xx) >= top else xx[0]
-            return 1. * (x >= cutoff)
-        else:
-            return x
-    
-    def normalize(x):
-        xx = x.sum()
-        return x / xx if xx > 0 else x * np.nan
-
-    pos = sig.apply(get_top, axis=1)
-    weight = volatility.copy()
-    weight[weight <= 0.05] = 0.05
-    pos *= 1 / weight
-    pos = pos.apply(normalize, axis=1)
-    rtn = pos.shift() * total_returns
-    pnl = rtn.sum(axis=1)
-    return pnl
+def plot(rtns, vol):
+    sig = get_signal_2(rtns, vol)
+    get_pnl(sig, rtns, vol).cumsum().plot()
 
 
 def run_new_signal(rtns, vol, mom=13, rev=2, mom_rank=20, rev_rank=3, holding=4):
@@ -145,31 +111,6 @@ def get_smx_data():
     return r.loc[:, u.index], v.loc[:, u.index]
 
 
-def run_smx(years=[2007, 2014, 2015, 2016, 2017]):
-    r, v = get_smx_data()
-    ans = {}
-    for year in years:
-        ans[year] = pd.DataFrame([])
-    for slow in xrange(10, 53):
-        for fast in xrange(2, np.min((slow - 5, 26))):
-            pnl = run_portfolio(r, v, fast=fast, slow=slow)
-            for year in years:
-                ans[year].loc[slow, fast] = pu.calc_sharpe(pnl[dt(year, 1, 1):])
-    for year in years:
-        ans[year].to_csv('~/%d.csv' % year)
-
-
-def run_smx_signal(r, v, capital=500.):
-    sig, sig_date = run_signal(r, v, *P17, capital=capital)
-    sig2, _ = run_signal(r, v, *PL, capital=capital)
-    sig3, _ = run_momentum_signal(r, v, capital=capital)
-    sig = pd.concat([sig, sig2, sig3], axis=1)
-    sig.columns = ['Short', 'Multiplier', 'Returns', 'Long', 'M', 'R', 'Momentum', 'M2', 'R2']
-    sig = sig.loc[:, ['Short', 'Long', 'Momentum', 'Multiplier', 'Returns']]
-    sig = sig.sort_values('Short', ascending=False)
-    return sig, sig_date
-
-
 def run_new_smx(r, v, capital=500):
     ans = run_new_signal(r, v, 26, 3)
     ans2 = run_new_signal(r, v, 50, 3)
@@ -179,13 +120,8 @@ def run_new_smx(r, v, capital=500):
     sig = sig.sort_values('M50', ascending=False)
     p = ans['pos'].iloc[-1]
     p = p[p>0]
-    return sig.dropna(), sig_date, p.index, ans['pnl'], ans2['pnl'] 
+    s = get_signal_2(r, v)
+    pos = (1. / v)[s > 0].ffill(limit=4)
+    pnl_x = get_clean_returns(r).mul(pos.shift()).sum(axis=1)
+    return sig.dropna(), sig_date, p.index, ans['pnl'], ans2['pnl'], pnl_x 
     
-
-def main():
-    run_smx()
-
-
-if __name__ == '__main__':
-    main()
-

@@ -17,11 +17,12 @@ from quant.lib import visualization_utils as vu
 from quant.lib.main_utils import Email
 
 
-def plot_pnl(pnl17, pnl, pnl_idx):
+def plot_pnl(pnl17, pnl, pnl_idx, pnl_x):
     plt.figure(figsize=(6, 4))
     vu.axis_area_plot(pnl17.iloc[-52:].cumsum())
     plt.plot(pnl.index[-52:], pnl.iloc[-52:].cumsum(), color='black', label='Long')
     plt.plot(pnl_idx.index[-52:], pnl_idx.iloc[-52:].cumsum(), color='green', label='Index')
+    plt.plot(pnl_x.index[-52:], pnl_x.iloc[-52:].cumsum(), color='red', label='Sig2')
     vu.use_monthly_ticks(pnl17.iloc[-52:])
     plt.legend(loc='best', frameon=False)
     plt.title('Cumulative PnL', weight='bold')
@@ -34,15 +35,15 @@ def plot_pnl(pnl17, pnl, pnl_idx):
 
 def run_smx_check(capital=500):
     r, v = sm.get_smx_data()
-    sig, sig_date, sig_idx, pnl17, pnl = sm.run_new_smx(r, v, capital=capital)
+    sig, sig_date, sig_idx, pnl17, pnl, pnl_x = sm.run_new_smx(r, v, capital=capital)
     fname = os.path.expanduser('~/signal.csv')
     sig.to_csv(fname)
     table = np.round(sig.loc[sig_idx], 2)
-    pnl_idx = 10. * r.mean(axis=1)
-    table2 = np.round(100. * pd.concat([pnl17, pnl, pnl_idx], axis=1).iloc[-6:], 2)
-    table2.columns = ['Short PnL (%)', 'Long PnL (%)', 'Index PnL (%)']
+    pnl_idx = 30. * r.mean(axis=1)
+    table2 = np.round(100. * pd.concat([pnl17, pnl, pnl_idx, pnl_x], axis=1).iloc[-6:], 2)
+    table2.columns = ['Short PnL (%)', 'Long PnL (%)', 'Index PnL (%)', 'Sig2 PnL (%)']
     table2.index = [x.strftime('%Y-%m-%d') for x in table2.index]
-    filename = plot_pnl(pnl17, pnl, pnl_idx)
+    filename = plot_pnl(pnl17, pnl, pnl_idx, pnl_x)
     mail = Email('wayne.cq@hotmail.com', ['wayne.cq@hotmail.com'], 'SMX Stocks')
     mail.add_date(dt.today())
     mail.add_image(filename, 600, 400)
