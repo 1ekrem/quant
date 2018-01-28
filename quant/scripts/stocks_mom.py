@@ -48,7 +48,7 @@ def get_signal_2(rtns, vol):
     s2 = get_momentum(rtns, vol, 26).shift(3)
     s3 = get_momentum(rtns, vol, 52).shift(3)
     sig = s3 + s2 - s1
-    return sig[s1 > s2].apply(get_top_3, axis=1)
+    return sig[(s1 > s2)].apply(get_top_3, axis=1)
 
 
 def get_pnl(sig, rtns, vol):

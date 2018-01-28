@@ -119,12 +119,13 @@ def estimate_boosting_stump(x, y, estimate_intercept=True):
     for i in np.arange(np.size(x, 1)):
         pred = x.iloc[:, i]
         u, ploc, score = DummyStump(pred, y * alpha)
-        e = StumpError(pred, y * alpha, u)
+        uu = np.min(pred) - 1. if np.isnan(u) else u
+        e = StumpError(pred, y * alpha, uu)
         w = get_weight_from_error(e)
-        alpha_delta = 1. * (pred < u) * (y >= 0) * np.exp(w)
-        alpha_delta += 1. * (pred >= u) * (y < 0) * np.exp(w)
-        alpha_delta += 1. * (pred < u) * (y < 0) * np.exp(-w)
-        alpha_delta += 1. * (pred >= u) * (y >= 0) * np.exp(-w)
+        alpha_delta = 1. * (pred < uu) * (y >= 0) * np.exp(w)
+        alpha_delta += 1. * (pred >= uu) * (y < 0) * np.exp(w)
+        alpha_delta += 1. * (pred < uu) * (y < 0) * np.exp(-w)
+        alpha_delta += 1. * (pred >= uu) * (y >= 0) * np.exp(-w)
         alpha *= alpha_delta
         alpha /= np.sum(alpha)
         ans.append([pred.name, y.name, u, e, w, ploc, score])

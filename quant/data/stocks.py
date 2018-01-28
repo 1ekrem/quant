@@ -27,6 +27,7 @@ def read_tickers_file(filename):
     try: 
         ans = pd.read_excel(os.path.expanduser('~/TempWork/scripts/%s.xlsx' % filename))
         ans.index = ans.ID
+        ans = ans.loc[ans.Included == 'Yes']
         return ans.Name
     except:
         return None
@@ -35,6 +36,8 @@ def read_tickers_file(filename):
 def import_tickers(filename, universe):
     data = read_tickers_file(filename)
     if data is not None:
+        du.pandas_delete(DATABASE_NAME, STOCKS_DESCRIPTION, du.DESCRIPTION_COLUMN_NAME, du.DESCRIPTION_INDEX_NAME,
+                         du.DESCRIPTION_VALUE_NAME, data_name=universe)
         data.name = universe
         tu.store_description(data, DATABASE_NAME, STOCKS_DESCRIPTION)
     
@@ -114,20 +117,7 @@ def import_smx_tickers():
 
 
 def get_smx_universe():
-    u = tu.get_description(DATABASE_NAME, STOCKS_DESCRIPTION, ['SMX Index'])
-    idx = []
-    for y, x in u.iloc[:, 0].to_dict().iteritems():
-        if 'TRUST' not in x and 'FUND' not in x and 'BLACKROCK' not in x and 'FIDELITY' not in x \
-        and 'ABERDEEN' not in x and 'ALPHA' not in x and 'BARING' not in x and 'BH ' not in x \
-        and 'BAILLIE' not in x and 'F&C' not in x and 'INV TR' not in x and 'HENDERSON' not in x \
-        and 'JPMORGAN' not in x and 'MONTANARO' not in x and 'POLAR' not in x and 'SCHRODER' not in x \
-        and 'STANDARD LIFE' not in x and 'INCOME' not in x and 'IMPAX' not in x and 'VINACAPITAL' not in x \
-        and 'HIGHBRIDGE' not in x and 'EDISTON' not in x and 'PRIVATE EQUITY' not in x and 'ECOFIN' not in x \
-        and 'MARTIN' not in x and 'INVESCO' not in x and 'TWENTYFOUR' not in x and 'REAL ESTATE' not in x \
-        and 'DUNEDIN' not in x and 'JUPITER' not in x and 'BBGI' not in x and 'REIT' not in x \
-        and 'WITAN' not in x and 'DEBENTURE' not in x:
-            idx.append(y)
-    return u.loc[idx]
+    return tu.get_description(DATABASE_NAME, STOCKS_DESCRIPTION, ['SMX Index'])
     
     
 def download_smx_prices():
