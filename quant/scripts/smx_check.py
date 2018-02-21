@@ -35,10 +35,9 @@ def plot_pnl(pnl17, pnl, pnl_idx, pnl_x):
 
 def run_smx_check(capital=500):
     r, v = sm.get_smx_data()
-    sig, sig_date, sig_idx, pnl17, pnl, pnl_x = sm.run_new_smx(r, v, capital=capital)
+    sig, sig_date, p, p2, pnl17, pnl, pnl_x = sm.run_new_smx(r, v, capital=capital)
     fname = os.path.expanduser('~/signal.csv')
     sig.to_csv(fname)
-    table = np.round(sig.loc[sig_idx], 2)
     pnl_idx = 30. * r.mean(axis=1)
     table2 = np.round(100. * pd.concat([pnl17, pnl, pnl_idx, pnl_x], axis=1).iloc[-6:], 2)
     table2.columns = ['Short PnL (%)', 'Long PnL (%)', 'Index PnL (%)', 'Sig2 PnL (%)']
@@ -48,9 +47,18 @@ def run_smx_check(capital=500):
     mail.add_date(dt.today())
     mail.add_image(filename, 600, 400)
     mail.add_text('PnL Summary', bold=True)
-    mail.add_table(table2)
-    mail.add_text('Stocks signal as of %s' % sig_date.strftime('%B %d, %Y'), bold=True)
-    mail.add_table(table)
+    mail.add_table(table2, width=600)
+    sig['Score'] = sig['M52'] + sig['M26'] - sig['Reversal']
+    table = sig.sort_values('Score', ascending=False)
+    table = np.round(table.loc[table.Reversal >= table.M26].iloc[:10], 2)
+    mail.add_text('Top scores as of %s' % sig_date.strftime('%B %d, %Y'), bold=True)
+    mail.add_table(table, width=800)
+    table = np.round(sig.loc[p], 2)
+    mail.add_text('26w signal positions as of %s' % sig_date.strftime('%B %d, %Y'), bold=True)
+    mail.add_table(table, width=800)
+    table = np.round(sig.loc[p2], 2)
+    mail.add_text('52w signal positions as of %s' % sig_date.strftime('%B %d, %Y'), bold=True)
+    mail.add_table(table, width=800)
     mail.add_attachment(fname)
     mail.send_email()
 
