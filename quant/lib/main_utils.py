@@ -43,6 +43,12 @@ def load_pickle(filename):
     return ans
 
 
+try:
+    EMAILADDRESS, EMAILPASSWORD = load_pickle(os.path.expanduser('~/quant.dat'))
+except:
+    logger.info('Environment variable not loaded')
+
+
 def write_pickle(data, filename):
     try:
         with open(filename, 'wb') as f:
@@ -177,7 +183,7 @@ class Email(object):
             server = smtplib.SMTP('smtp.live.com:587')
             server.ehlo()
             server.starttls()
-            server.login(os.getenv('emailaddress'), os.getenv('emailpassword'))
+            server.login(EMAILADDRESS, EMAILPASSWORD)
             server.sendmail(self.from_address, self.to_addresses, self.msg.as_string())
             server.quit()
         except Exception as e:
