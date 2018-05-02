@@ -137,8 +137,6 @@ def run_new_smx(r, v, capital=500):
     p2 = p2[p2 > 0]
     pos = (1. / v)[s > 0].ffill(limit=4)
     pnl_x = get_clean_returns(r).mul(pos.shift()).sum(axis=1)
-    dd = get_drawdown(r, v)
     sig = sig.dropna()
-    sig = pd.concat([sig, dd.loc[sig.index]], axis=1)
     return sig, sig_date, p.index, p2.index, ans['pnl'], ans2['pnl'], pnl_x
 

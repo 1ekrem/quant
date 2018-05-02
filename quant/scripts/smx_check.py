@@ -33,7 +33,7 @@ def plot_pnl(pnl17, pnl, pnl_idx, pnl_x):
     return filename
 
 
-def run_smx_check(capital=500):
+def run_smx_check(capital=500 * 3.3):
     r, v = sm.get_smx_data()
     sig, sig_date, p, p2, pnl17, pnl, pnl_x = sm.run_new_smx(r, v, capital=capital)
     fname = os.path.expanduser('~/signal.csv')
