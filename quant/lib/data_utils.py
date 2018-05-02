@@ -11,7 +11,6 @@ from datetime import datetime as dt
 
 # Database info
 HOST = 'localhost'
-#USER = 'wayne'
 USER = 'root'
 PASSWORD = ''
 

@@ -57,7 +57,7 @@ def get_pnl(sig, rtns, vol):
     
 
 def plot(rtns, vol):
-    sig = get_signal_2(rtns, vol)
+    sig = get_signal_1(rtns, vol)
     get_pnl(sig, rtns, vol).cumsum().plot()
 
 
@@ -128,6 +128,7 @@ def run_new_smx(r, v, capital=500):
     sig_date = ans['rev'].index[-1]
     sig = pd.concat([ans['rev'].iloc[-1], ans['mom'].iloc[-1], ans2['mom'].iloc[-1], capital / v.iloc[-1]], axis=1)
     sig.columns = ['Reversal', 'M26', 'M52', 'Position']
+    sig.loc[:, 'Score'] = sig.M52 + sig.M26 - sig.Reversal
     sig = sig.sort_values('M52', ascending=False)
     s = get_signal_2(r, v)
     p = ans['pos'].iloc[-1]
@@ -140,5 +141,4 @@ def run_new_smx(r, v, capital=500):
     sig = sig.dropna()
     sig = pd.concat([sig, dd.loc[sig.index]], axis=1)
     return sig, sig_date, p.index, p2.index, ans['pnl'], ans2['pnl'], pnl_x
-
 

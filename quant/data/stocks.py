@@ -42,30 +42,22 @@ def import_tickers(filename, universe):
         tu.store_description(data, DATABASE_NAME, STOCKS_DESCRIPTION)
     
 
-def get_quandl_stock_id(stock_id):
-    if stock_id.endswith(' LN'):
-        return 'LSE/' + stock_id[:-3]
-    else:
-        return stock_id
 
-
-def load_quandl_stock_prices(stock_id):
-    series_id = get_quandl_stock_id(stock_id)
-    try:
-        return quandldata.load_series(series_id)
-    except:
-        logger.warn('Failed to load Quandl price for %s' % stock_id)
-        return None
-
-
-def download_stock_prices(stock_id):
-    logger.info('Downloading stock prices - %s' % stock_id)
-    data = load_quandl_stock_prices(stock_id)
-    if data is not None:
-        for c in data.columns:
-            tmp = data[c].to_frame()
-            tmp.columns = [stock_id]
-            tu.store_timeseries(tmp, DATABASE_NAME, STOCKS, c)
+def import_smx_bloomberg_prices():
+    filename = os.path.expanduser('~/TempWork/scripts/smx_bloomberg.xlsx')
+    data = pd.read_excel(filename)
+    n = len(data.columns)
+    i = 0
+    while i < n:
+        stock_name = data.columns[i+1]
+        logger.info('Storing %s' % stock_name)
+        tmp = data.iloc[:, i+1]
+        tmp.index = data.iloc[:, i]
+        tmp = tmp.dropna()
+        tmp.name = stock_name
+        tmp = tmp.to_frame()
+        tu.store_timeseries(tmp, DATABASE_NAME, STOCKS, 'Last Close')
+        i += 2
 
 
 def get_universe(universe):
@@ -86,44 +78,12 @@ def load_stock_returns(start_date=None, end_date=None, data_name='Returns'):
         return tu.get_timeseries(DATABASE_NAME, STOCK_RETURNS, index_range=(start_date, end_date), data_name=data_name)
 
 
-def load_stock_index(ticker):
-    if ticker == 'UKX Index':
-        b = tu.get_timeseries(DATABASE_NAME, 'bloomberg_index_prices', column_list=['UKX Index'])
-        q = tu.get_timeseries(DATABASE_NAME, quandldata.QUANDL_FUTURES, data_name='FTSE 100')
-        q = q.Settle
-        if b.last_valid_index() < q.last_valid_index():
-            idx = b.last_valid_index()
-            b = b[:idx].iloc[:, 0]
-            q = q[q.index > idx]
-            b = pd.concat([b, q], axis=0)
-            b.name = 'UKX Index'
-            return b
-    else:
-        return None
-
-
-def stock_returns_loader(stock_ids):
-    ans = {}
-    for idx in stock_ids:
-        r = tu.get_timeseries(DATABASE_NAME, STOCK_RETURNS, data_name=idx)
-        if r is not None:
-            r.loc[r.Total.abs() > .7, 'Total'] = np.nan
-            ans[idx] = r
-    return ans
-
-
 def import_smx_tickers():
     import_tickers('smx', 'SMX Index')
 
 
 def get_smx_universe():
     return tu.get_description(DATABASE_NAME, STOCKS_DESCRIPTION, ['SMX Index'])
-    
-    
-def download_smx_prices():
-    u = get_smx_universe()
-    for idx in u.index:
-        download_stock_prices(idx)
 
 
 def calculate_stock_returns():
@@ -136,12 +96,3 @@ def calculate_stock_returns():
     vol = r[r>0].rolling(26, min_periods=8).median() * np.sqrt(52.)
     tu.store_timeseries(rtns, DATABASE_NAME, STOCK_RETURNS, 'Returns')
     tu.store_timeseries(vol, DATABASE_NAME, STOCK_RETURNS, 'Volatility')
-
-
-def main():
-    download_smx_prices()
-    calculate_stock_returns()
-
-
-if __name__ == '__main__':
-    main()
