@@ -9,6 +9,7 @@ import pandas as pd
 from quant.lib import data_utils as du, timeseries_utils as tu, portfolio_utils as pu
 from quant.lib.main_utils import logger
 from quant.data import quandldata
+from datetime import datetime as dt
 
 
 DATABASE_NAME = 'quant'
@@ -58,6 +59,20 @@ def import_smx_bloomberg_prices():
         tmp = tmp.to_frame()
         tu.store_timeseries(tmp, DATABASE_NAME, STOCKS, 'Last Close')
         i += 2
+
+
+def export_smx_bloomberg_file():
+    filename = os.path.expanduser('~/TempWork/scripts/smx_bloomberg.xlsx')
+    u = get_smx_universe()
+    ans = []
+    today = dt.today().strftime('%m/%d/%Y')
+    for i, x in enumerate(u.index):
+        s = '''=BDH("%s Equity", "PX_LAST", "1/1/2008", "%s")''' % (x, today)
+        ans.append(pd.DataFrame([[s, '']], columns=[i+1, x], index=[0]))
+    ans = pd.concat(ans, axis=1)
+    ff = pd.ExcelWriter(filename)
+    ans.to_excel(ff, 'SMX')
+    ff.save()
 
 
 def get_universe(universe):
