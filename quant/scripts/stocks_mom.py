@@ -13,8 +13,8 @@ from datetime import datetime as dt
 def get_top_3(x):
     ans = np.nan * x
     s = np.argsort(x[-x.isnull()])
-    if len(s) > 3:
-        s = s[-3:]
+    if len(s) > 5:
+        s = s[-5:]
     ans.loc[x[-x.isnull()].iloc[s].index] = 1.
     return ans
 
@@ -26,7 +26,7 @@ def get_clean_returns(rtns):
 
 
 def get_momentum(rtns, vol, mom):
-    return np.sqrt(52.) * (rtns.rolling(mom, min_periods=1).mean() / vol)
+    return rtns.rolling(mom, min_periods=1).sum() / vol / np.sqrt(mom)
 
 
 def get_signal_1(rtns, vol):
@@ -48,7 +48,7 @@ def get_signal_2(rtns, vol):
     s2 = get_momentum(rtns, vol, 26).shift(3)
     s3 = get_momentum(rtns, vol, 52).shift(3)
     sig = s3 + s2 - s1
-    return sig[(s1 > s2)].apply(get_top_3, axis=1)
+    return sig.apply(get_top_3, axis=1)
 
 
 def get_pnl(sig, rtns, vol):
@@ -56,16 +56,14 @@ def get_pnl(sig, rtns, vol):
     return get_clean_returns(rtns).mul(pos.shift()).sum(axis=1)
     
 
-def plot(rtns, vol):
-    sig = get_signal_1(rtns, vol)
-    get_pnl(sig, rtns, vol).cumsum().plot()
+def plot(rtns, vol, posvol):
+    sig = get_signal_2(rtns, vol)
+    get_pnl(sig, rtns, posvol).cumsum().plot()
 
 
-def run_new_signal(rtns, vol, mom=13, rev=2, mom_rank=20, rev_rank=3, holding=4):
+def run_new_signal(rtns, vol, posvol, mom=13, rev=2, mom_rank=20, rev_rank=3, holding=4):
     r = rtns.copy()
     r[r.abs() > .7] = np.nan
-    #s1 = np.sqrt(52.) * (rtns.rolling(mom, min_periods=1).mean() / vol).shift(rev)
-    #s2 = np.sqrt(52.) * (rtns.rolling(rev, min_periods=1).mean() / vol)
     s1 = get_momentum(rtns, vol, mom).shift(rev)
     s2 = get_momentum(rtns, vol, rev)
     s = np.nan * vol
@@ -80,7 +78,7 @@ def run_new_signal(rtns, vol, mom=13, rev=2, mom_rank=20, rev_rank=3, holding=4)
                 tmp2 = tmp2.iloc[:rev_rank]
             if len(tmp2) > 0:
                 s.loc[idx, tmp2.index] = 1.
-    pos = 1. / vol
+    pos = 1. / posvol
     pos = pos[s > 0]
     pos = pos.ffill(limit=holding)
     pnl = r.mul(pos.shift()).sum(axis=1)
@@ -110,7 +108,8 @@ def get_smx_data():
     u = stocks.get_smx_universe()
     r = stocks.load_stock_returns(data_name='Returns')
     v = stocks.load_stock_returns(data_name='Volatility')
-    return r.loc[:, u.index], v.loc[:, u.index]
+    v2 = stocks.load_stock_returns(data_name='PosVol')
+    return r.loc[:, u.index], v.loc[:, u.index], v2.loc[:, u.index]
 
 
 def get_drawdown(r, v, lookback=13):
@@ -122,11 +121,11 @@ def get_drawdown(r, v, lookback=13):
     return ans
 
     
-def run_new_smx(r, v, capital=500):
-    ans = run_new_signal(r, v, 26, 3)
-    ans2 = run_new_signal(r, v, 52, 3)
+def run_new_smx(r, v, posvol, capital=500):
+    ans = run_new_signal(r, v, posvol, 26, 3)
+    ans2 = run_new_signal(r, v, posvol, 52, 3)
     sig_date = ans['rev'].index[-1]
-    sig = pd.concat([ans['rev'].iloc[-1], ans['mom'].iloc[-1], ans2['mom'].iloc[-1], capital / v.iloc[-1]], axis=1)
+    sig = pd.concat([ans['rev'].iloc[-1], ans['mom'].iloc[-1], ans2['mom'].iloc[-1], capital / posvol.iloc[-1]], axis=1)
     sig.columns = ['Reversal', 'M26', 'M52', 'Position']
     sig.loc[:, 'Score'] = sig.M52 + sig.M26 - sig.Reversal
     sig = sig.sort_values('M52', ascending=False)
@@ -135,8 +134,8 @@ def run_new_smx(r, v, capital=500):
     p = p[p > 0]
     p2 = ans2['pos'].iloc[-1]
     p2 = p2[p2 > 0]
-    pos = (1. / v)[s > 0].ffill(limit=4)
+    pos = (1. / posvol)[s > 0].ffill(limit=4)
     pnl_x = get_clean_returns(r).mul(pos.shift()).sum(axis=1)
     sig = sig.dropna()
-    return sig, sig_date, p.index, p2.index, ans['pnl'], ans2['pnl'], pnl_x
+    return sig, pos.iloc[-1] * capital, sig_date, p.index, p2.index, ans['pnl'], ans2['pnl'], pnl_x
 

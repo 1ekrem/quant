@@ -108,6 +108,10 @@ def calculate_stock_returns():
     rtns = p.resample('W').last()
     rtns = rtns.diff() / rtns.shift()
     r = rtns.abs()
-    vol = r[r>0].rolling(26, min_periods=8).median() * np.sqrt(52.)
+    vol = r.rolling(52, min_periods=13).median()
+    vol[vol < 0.01] = 0.01
+    v2 = vol.copy()
+    v2[v2 < .03] = .03
     tu.store_timeseries(rtns, DATABASE_NAME, STOCK_RETURNS, 'Returns')
     tu.store_timeseries(vol, DATABASE_NAME, STOCK_RETURNS, 'Volatility')
+    tu.store_timeseries(vol, DATABASE_NAME, STOCK_RETURNS, 'PosVol')
