@@ -17,13 +17,12 @@ from quant.lib import visualization_utils as vu
 from quant.lib.main_utils import Email
 
 
-def plot_pnl(pnl17, pnl, pnl_idx, pnl_x):
+def plot_pnl(pnl, pnl2, pnl_idx):
     plt.figure(figsize=(6, 4))
-    vu.axis_area_plot(pnl17.iloc[-52:].cumsum())
-    plt.plot(pnl.index[-52:], pnl.iloc[-52:].cumsum(), color='black', label='Long')
+    vu.axis_area_plot(pnl.iloc[-52:].cumsum())
+    plt.plot(pnl2.index[-52:], pnl.iloc[-52:].cumsum(), color='black', label='Rev')
     plt.plot(pnl_idx.index[-52:], pnl_idx.iloc[-52:].cumsum(), color='green', label='Index')
-    plt.plot(pnl_x.index[-52:], pnl_x.iloc[-52:].cumsum(), color='red', label='Sig2')
-    vu.use_monthly_ticks(pnl17.iloc[-52:])
+    vu.use_monthly_ticks(pnl.iloc[-52:])
     plt.legend(loc='best', frameon=False)
     plt.title('Cumulative PnL', weight='bold')
     plt.tight_layout()
@@ -35,33 +34,25 @@ def plot_pnl(pnl17, pnl, pnl_idx, pnl_x):
 
 def run_smx_check(capital=500 * 1.9):
     r, v, v2 = sm.get_smx_data()
-    sig, pos, sig_date, p, p2, pnl17, pnl, pnl_x = sm.run_new_smx(r, v, v2, capital=capital)
+    sig, pos, pos2, sig_date, pnl, pnl2 = sm.run_new_smx(r, v, v2, capital=capital)
     fname = os.path.expanduser('~/signal.csv')
     sig.to_csv(fname)
-    pnl_idx = 300. * r.mean(axis=1)
-    table2 = np.round(100. * pd.concat([pnl17, pnl, pnl_idx, pnl_x], axis=1).iloc[-6:], 2)
-    table2.columns = ['Short PnL (%)', 'Long PnL (%)', 'Index PnL (%)', 'Sig2 PnL (%)']
-    table2.index = [x.strftime('%Y-%m-%d') for x in table2.index]
-    table3 = np.round(pos[pos > 0].to_frame())
-    filename = plot_pnl(pnl17, pnl, pnl_idx, pnl_x)
+    pnl_idx = capital * r.mean(axis=1)
+    table = np.round(100. * pd.concat([pnl, pnl2, pnl_idx], axis=1).iloc[-6:], 2)
+    table.columns = ['Mom PnL (%)', 'Rev PnL (%)', 'Index PnL (%)']
+    table.index = [x.strftime('%Y-%m-%d') for x in table.index]
+    table2 = np.round(pos[pos > 0].to_frame())
+    table3 = np.round(pos2[pos2 > 0].to_frame())
+    filename = plot_pnl(pnl, pnl2, pnl_idx)
     mail = Email('wayne.cq@hotmail.com', ['wayne.cq@hotmail.com'], 'SMX Stocks')
     mail.add_date(dt.today())
     mail.add_image(filename, 600, 400)
     mail.add_text('PnL Summary', bold=True)
-    mail.add_table(table2, width=600)
-    sig['Score'] = sig['M52'] + sig['M26'] - sig['Reversal']
-    table = sig.sort_values('Score', ascending=False)
-    table = np.round(table.loc[table.Reversal >= table.M26].iloc[:10], 2)
-    mail.add_text('Signal Positions')
+    mail.add_table(table, width=600)
+    mail.add_text('Momentum Positions')
+    mail.add_table(table2, width=400)
+    mail.add_text('Reversal Positions')
     mail.add_table(table3, width=400)
-    mail.add_text('Top scores as of %s' % sig_date.strftime('%B %d, %Y'), bold=True)
-    mail.add_table(table, width=800)
-    table = np.round(sig.loc[p], 2)
-    mail.add_text('26w signal positions as of %s' % sig_date.strftime('%B %d, %Y'), bold=True)
-    mail.add_table(table, width=800)
-    table = np.round(sig.loc[p2], 2)
-    mail.add_text('52w signal positions as of %s' % sig_date.strftime('%B %d, %Y'), bold=True)
-    mail.add_table(table, width=800)
     mail.add_attachment(fname)
     mail.send_email()
 

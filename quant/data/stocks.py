@@ -114,4 +114,4 @@ def calculate_stock_returns():
     v2[v2 < .03] = .03
     tu.store_timeseries(rtns, DATABASE_NAME, STOCK_RETURNS, 'Returns')
     tu.store_timeseries(vol, DATABASE_NAME, STOCK_RETURNS, 'Volatility')
-    tu.store_timeseries(vol, DATABASE_NAME, STOCK_RETURNS, 'PosVol')
+    tu.store_timeseries(v2, DATABASE_NAME, STOCK_RETURNS, 'PosVol')
