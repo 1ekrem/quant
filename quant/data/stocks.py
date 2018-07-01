@@ -6,6 +6,7 @@ Created on 18 Sep 2017
 import os
 import numpy as np
 import pandas as pd
+import googlefinance.client as gc
 from quant.lib import data_utils as du, timeseries_utils as tu, portfolio_utils as pu
 from quant.lib.main_utils import logger
 from quant.data import quandldata
@@ -13,17 +14,15 @@ from datetime import datetime as dt
 
 
 DATABASE_NAME = 'quant'
-STOCKS = 'stocks'
-STOCK_RETURNS = 'stock_returns'
 STOCKS_DESCRIPTION = 'stocks_description'
+GOOGLE_RETURNS = 'google_returns'
 
 
-def create_table():
-    du.create_t2_timeseries_table(DATABASE_NAME, STOCKS)
-    du.create_t2_timeseries_table(DATABASE_NAME, STOCK_RETURNS)
-    du.create_description_table(DATABASE_NAME, STOCKS_DESCRIPTION)
+def create_google_table():
+    du.create_t2_timeseries_table(DATABASE_NAME, GOOGLE_RETURNS)
 
 
+# Tickers
 def read_tickers_file(filename):
     try: 
         ans = pd.read_excel(os.path.expanduser('~/TempWork/scripts/%s.xlsx' % filename))
@@ -41,77 +40,51 @@ def import_tickers(filename, universe):
                          du.DESCRIPTION_VALUE_NAME, data_name=universe)
         data.name = universe
         tu.store_description(data, DATABASE_NAME, STOCKS_DESCRIPTION)
-    
 
 
-def import_smx_bloomberg_prices():
-    filename = os.path.expanduser('~/TempWork/scripts/smx_bloomberg.xlsx')
-    data = pd.read_excel(filename)
-    n = len(data.columns)
-    i = 0
-    while i < n:
-        stock_name = data.columns[i+1]
-        logger.info('Storing %s' % stock_name)
-        tmp = data.iloc[:, i+1]
-        tmp.index = data.iloc[:, i]
-        tmp = tmp.dropna()
-        tmp.name = stock_name
-        tmp = tmp.to_frame()
-        tu.store_timeseries(tmp, DATABASE_NAME, STOCKS, 'Last Close')
-        i += 2
+def import_ftse_smx_tickers():
+    import_tickers('FTSESMX', 'SMX')
 
 
-def export_smx_bloomberg_file():
-    filename = os.path.expanduser('~/TempWork/scripts/smx_bloomberg.xlsx')
-    u = get_smx_universe()
-    ans = []
-    today = dt.today().strftime('%m/%d/%Y')
-    for i, x in enumerate(u.index):
-        s = '''=BDH("%s Equity", "PX_LAST", "1/1/2008", "%s")''' % (x, today)
-        ans.append(pd.DataFrame([[s, '']], columns=[i+1, x], index=[0]))
-    ans = pd.concat(ans, axis=1)
-    ff = pd.ExcelWriter(filename)
-    ans.to_excel(ff, 'SMX')
-    ff.save()
+# Google prices
+def load_google_prices(ticker, exchange='LON', period='1Y'):
+    param = {'q': ticker, 'i': '86400', 'x': exchange, 'p': period}
+    return gc.get_price_data(param)
 
 
+def import_google_prices(ticker, exchange='LON', period='1Y'):
+    logger.info('Loading %s' % ticker)
+    data = load_google_prices(ticker, exchange, period)
+    if data.empty:
+        logger.info('Data not found')
+    else:
+        data = data.resample('B').last()
+        data = data.loc[data.Close > 1e-2]
+        v = (data.Close * data.Volume / 1e6).dropna()
+        r = np.log(data.Close).diff().dropna()
+        v.name = ticker
+        r.name = ticker
+        tu.store_timeseries(r, DATABASE_NAME, GOOGLE_RETURNS, 'Returns')
+        tu.store_timeseries(v, DATABASE_NAME, GOOGLE_RETURNS, 'Volume')
+
+
+def import_smx_google_prices(period='1M'):
+    u = get_ftse_smx_universe()
+    for idx in u.index:
+        import_google_prices(idx, 'LON', period)
+
+
+# Load data
 def get_universe(universe):
     return tu.get_description(DATABASE_NAME, STOCKS_DESCRIPTION, [universe])
 
 
-def load_stock_prices(start_date=None, end_date=None):
+def get_ftse_smx_universe():
+    return tu.get_description(DATABASE_NAME, STOCKS_DESCRIPTION, ['SMX'])
+
+
+def load_google_stock_returns(start_date=None, end_date=None, data_name='Returns'):
     if start_date is None and end_date is None:
-        return tu.get_timeseries(DATABASE_NAME, STOCKS, data_name='Last Close')
+        return tu.get_timeseries(DATABASE_NAME, GOOGLE_RETURNS, data_name=data_name)
     else:
-        return tu.get_timeseries(DATABASE_NAME, STOCKS, index_range=(start_date, end_date), data_name='Last Close')
-
-
-def load_stock_returns(start_date=None, end_date=None, data_name='Returns'):
-    if start_date is None and end_date is None:
-        return tu.get_timeseries(DATABASE_NAME, STOCK_RETURNS, data_name=data_name)
-    else:
-        return tu.get_timeseries(DATABASE_NAME, STOCK_RETURNS, index_range=(start_date, end_date), data_name=data_name)
-
-
-def import_smx_tickers():
-    import_tickers('smx', 'SMX Index')
-
-
-def get_smx_universe():
-    return tu.get_description(DATABASE_NAME, STOCKS_DESCRIPTION, ['SMX Index'])
-
-
-def calculate_stock_returns():
-    u = get_smx_universe()
-    p = tu.get_timeseries(DATABASE_NAME, STOCKS, data_name='Last Close')    
-    p = p.ffill(limit=5)
-    rtns = p.resample('W').last()
-    rtns = rtns.diff() / rtns.shift()
-    r = rtns.abs()
-    vol = r.rolling(52, min_periods=13).median()
-    vol[vol < 0.01] = 0.01
-    v2 = vol.copy()
-    v2[v2 < .03] = .03
-    tu.store_timeseries(rtns, DATABASE_NAME, STOCK_RETURNS, 'Returns')
-    tu.store_timeseries(vol, DATABASE_NAME, STOCK_RETURNS, 'Volatility')
-    tu.store_timeseries(v2, DATABASE_NAME, STOCK_RETURNS, 'PosVol')
+        return tu.get_timeseries(DATABASE_NAME, GOOGLE_RETURNS, index_range=(start_date, end_date), data_name=data_name)

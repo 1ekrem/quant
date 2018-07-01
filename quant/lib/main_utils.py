@@ -44,7 +44,7 @@ def load_pickle(filename):
 
 
 try:
-    EMAILADDRESS, EMAILPASSWORD = load_pickle(os.path.expanduser('~/quant.dat'))
+    EMAILADDRESS, EMAILPASSWORD = load_pickle('/home/wayne/quant.dat')
 except:
     logger.info('Environment variable not loaded')
 

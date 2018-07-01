@@ -1,2 +1,2 @@
-cd /home/wayne/workspace/quant/quant/data/
-ipython stocks.py
+cd /home/wayne/workspace/quant/scripts/
+ipython load_google_stocks.py
