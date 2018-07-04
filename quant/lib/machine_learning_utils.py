@@ -9,6 +9,7 @@ from scipy import stats as ss
 from quant.lib import timeseries_utils as tu
 from quant.lib.main_utils import logger
 from audioop import cross
+from quant.lib.timeseries_utils import dataframe_to_series, series_to_dataframe
 
 MINIMUM_ERROR = 1e-4
 BOOSTING_INTERCEPT = 'Intercept'
@@ -36,15 +37,14 @@ def give_me_pandas_variables(x, y):
     return myx.fillna(0.), myy.fillna(0.)
 
 
-def data_to_score(data, mean=None, sd=None):
-    ans = data.copy()
-    d = data[-np.isnan(data)]
+def get_score(data, mean=None, sd=None):
+    x = tu.dataframe_to_series(data)
     if mean is None:
-        mean = np.mean(d)
+        mean = x.mean()
     if sd is None:
-        sd = np.std(d)
-    ans[-np.isnan(ans)] = ss.norm.cdf(ans.values, loc=mean, scale=sd)
-    return 2. * (ans - .5)
+        sd = x.std()
+    x[~x.isnull()] = 2. * (ss.norm.cdf(x[~x.isnull()], loc=mean, scale=sd) - .5)
+    return tu.series_to_dataframe(pd.Series(x), data.columns, data.index)
 
 
 # Boosting

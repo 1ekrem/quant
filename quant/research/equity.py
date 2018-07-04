@@ -47,8 +47,9 @@ class MomentumSim(object):
         v = w[w > 0].rolling(52, min_periods=13).median().ffill().bfill().fillna(0.)
         v[v < STOCK_VOL_FLOOR] = STOCK_VOL_FLOOR
         self.stock_vol = v
-        self.r = self.stock_returns.cumsum().resample('W').last().diff()
-        self.v = tu.resample(v, self.r).ffill().bfill()
+        self._r = self.stock_returns.cumsum().resample('W').last().diff()
+        self.v = tu.resample(v, self._r).ffill().bfill()
+        self.r = mu.get_score(self._r.divide(self.v), 0, 1)
         
     def create_estimation_data(self, depth):
         lookbacks = [3 ** (i+1) for i in xrange(depth)]
