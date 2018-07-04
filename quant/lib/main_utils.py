@@ -8,6 +8,9 @@ import os
 import smtplib
 import cPickle as pickle
 import pandas as pd
+import numpy as np
+from datetime import datetime as dt
+from dateutil.relativedelta import relativedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
 from email.mime.base import MIMEBase
@@ -19,7 +22,7 @@ logging.basicConfig(format='%(asctime)s %(message)s')
 logger = logging.getLogger('quant')
 logger.setLevel(20)
 
-MODEL_PATH = '/home/wayne/TempWork/models'
+MODEL_PATH = '/home/wayne/TempWork/models/'
 
 EMPTY_EMAIL = '''
 <html>
@@ -56,6 +59,10 @@ def write_pickle(data, filename):
             f.close()
     except Exception as e:
         logger.warn('Failed to write pickle %s:\n%s' % (filename, str(e)))
+
+
+def get_timeline(start_date, end_date):
+    return pd.Series([0., 0.], index=[start_date, end_date]).resample('B').last()
 
 
 def get_table_html(table, inc_index=True, inc_columns=True, width=None):

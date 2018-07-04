@@ -8,6 +8,7 @@ import pandas as pd
 from scipy import stats as ss
 from quant.lib import timeseries_utils as tu
 from quant.lib.main_utils import logger
+from audioop import cross
 
 MINIMUM_ERROR = 1e-4
 BOOSTING_INTERCEPT = 'Intercept'
@@ -89,7 +90,7 @@ def DummyStump(x, y):
     loc = np.arange(len(data_x))
     loc = loc[score == np.max(score)][0]
     cutoff = data['x'][loc] if loc > 0 else np.nan
-    ploc = loc / len(data_x)
+    ploc = 1. * loc / len(data_x)
     if ploc > .5:
         ploc = 1. - ploc
     score = 2. * score[loc]
@@ -342,22 +343,22 @@ class RandomBoostingComponent(object):
         self.normalized_signal = self.core.normalized_signal
 
 
-class StockComponent(object):
-    '''
-    Stock Strategy component
-    '''    
-    def __init__(self, asset_data, in_sample, out_of_sample, cols, model_function, 
-                 prediction_function, model=None, use_names=None, params=None, *args, **kwargs):
-        self.asset_data = asset_data
-        self.in_sample = in_sample
-        self.out_of_sample = out_of_sample
-        self.cols = cols
+class CrossSectionComponent(object):    
+    def __init__(self, predictors, timeline, asset_names, model_function, prediction_function,
+                 asset_returns=None, model=None, cross_validation_buckets=10, params=None, *args, **kwargs):
+        self.asset_returns = asset_returns
+        self.predictors = predictors
+        self.timeline = timeline
+        self.asset_names = asset_names
         self.model_function = model_function
         self.prediction_function = prediction_function
         self.model = model
-        self.use_names = asset_data.keys() if use_names is None else use_names
+        self.cross_validation_buckets = cross_validation_buckets
         self.params = {} if params is None else params
         self.run_model()
+
+    def _shape(self, data):
+        return tu.resample(data, self.timeline).loc[:, self.asset_names]
 
     def run_model(self):
         self.prepare_data()
@@ -365,41 +366,56 @@ class StockComponent(object):
         self.calculate_signals()
     
     def prepare_data(self):
-        x = []
-        y = []
-        for k, v in self.asset_data.iteritems():
-            if k in self.use_names:
-                tmp = v.loc[self.in_sample]
-                tmp = tmp.loc[-tmp.Target.isnull()]
-                if not tmp.empty:
-                    x.append(tmp[self.cols])
-                    y.append(tmp['Target'])
-        x = pd.concat(x, axis=0)
-        y = pd.concat(y, axis=0)
-        self.medians = x.median(axis=0)
-        self._x = x.fillna(self.medians)
-        self._y = y.fillna(0.)
+        if self.asset_returns is not None:
+            self._y = tu.dataframe_to_series(self._shape(self.asset_returns))
+        self._x = pd.concat([tu.dataframe_to_series(self._shape(v)) for v in self.predictors.values()], axis=1).fillna(0.)
+        self._x.columns = self.predictors.keys()
 
     def estimate_model(self):
-        if self.model is None:
+        if self.model is None and self._y is not None:
             logger.info('Estimating model with %d observations' % len(self._x))
-            self.model = self.model_function(x=self._x, y=self._y, **self.params)
+            self.model = self.model_function(x=self._x.loc[~self._y.isnull(), :], y=self._y[~self._y.isnull()], **self.params)
     
     def calculate_signals(self):
-        self.signal = {}
-        for k, v in self.asset_data.iteritems():
-            tmp = v.loc[self.out_of_sample, self.cols]
-            tmp = tmp.loc[(-tmp.isnull()).any(axis=1)]
-            if not tmp.empty:
-                tmp = tmp.fillna(self.medians)
-                self.signal[k] = self.prediction_function(x=tmp, ans=self.model)
+        self.signals = tu.series_to_dataframe(self.prediction_function(x=self._x, ans=self.model), self.asset_names, self.timeline.index)
 
+    def run_cross_validation(self):
+        if self._y is not None:
+            y = self._y[~self._y.isnull()]
+            x = self._x[~self._y.isnull()]
+            self._seq = get_cross_validation_buckets(len(y), self.cross_validation_buckets)
+            self.errors = []
+            for i, s in enumerate(self._seq):
+                logger.info('Cross validation bucket %s' % (i + 1))
+                x_out = x.iloc[s]
+                y_out = y.iloc[s]
+                x_in = x.loc[~x.index.isin(x_out.index)]
+                y_in = y.loc[~y.index.isin(y_out.index)]
+                m = self.model_function(x=x_in, y=y_in, **self.params)
+                pred = self.prediction_function(x=x_out, ans=m)
+                self.errors.append(StumpError(pred.values.flatten(), y_out.values.flatten(), 0.))
+            self.error_rate = np.mean(self.errors)
+        else:
+            self.errors = None
+            self.error_rate = None
 
 class StockRandomBoostingComponent(object):
-    def __init__(self, asset_data, in_sample, out_of_sample, cols, params=None, model=None, use_names=None):
-        self.core = StockComponent(asset_data, in_sample, out_of_sample, cols,
-                                   model_function=RandomBoosting, prediction_function=RandomBoostingPrediction,
-                                   params=params, model=model, use_names=use_names)
-        self.model = self.core.model
-        self.signal = self.core.signal
+    def __init__(self, predictors, timeline, asset_names, asset_returns=None, model=None, cross_validation_buckets=10):
+        self.core = CrossSectionComponent(predictors, timeline, asset_names, asset_returns=asset_returns, model=model,
+                                          model_function=RandomBoosting, prediction_function=RandomBoostingPrediction,
+                                          cross_validation_buckets=cross_validation_buckets)
+        self.model = model
+        self.run()
 
+    def run(self):
+        if self.model is None:
+            self.core.estimate_model()
+            self.model = self.core.model
+        if self.model is not None:
+            self.core.calculate_signals()
+            self.signals = self.core.signals
+
+    def run_cross_validation(self):
+        self.core.run_cross_validation()
+        self.errors = self.core.errors
+        self.error_rate = self.core.error_rate

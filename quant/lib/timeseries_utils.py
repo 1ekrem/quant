@@ -105,7 +105,9 @@ def pandas_ewma(data, span=None, *args, **kwargs):
     return data.ewm(span=span, ignore_na=True).mean() if span > 1. else data
 
 
-def pandas_weeks_ewma(data, span=None, *args, **kwargs):
-    df = data.index.to_series().diff().dropna().mean()
-    es = 7. * span / df.days if span is not None else None
-    return data.ewm(span=es, ignore_na=True).mean() if es > 1. else data 
+def dataframe_to_series(data):
+    return pd.Series(data.values.flatten())
+
+
+def series_to_dataframe(data, columns, indices):
+    return pd.DataFrame(np.reshape(data.values.flatten(), (len(indices), len(columns))), index=indices, columns=columns)
