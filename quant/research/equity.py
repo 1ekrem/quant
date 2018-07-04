@@ -100,27 +100,8 @@ class MomentumSim(object):
             data = self.optimal_depth, self.error_rate, self.model
             write_pickle(data, filename)
 
-    def run_simulation(self):
-        self.selection = None
-        self.error_rate = None
-        if self.load_model:
-            timeline = get_timeline(self.start_date, self.end_date).resample('W').last()
-            comp = self.load_existing_model(timeline)
-        elif self.cross_validation:
-            self.selection, self.error_rate, comp = self.run_cross_validation(in_sample, out_of_sample)
-            if self.error_rate is not None:
-                logger.info('Error rate %.1f%% at %s' % (100. * self.error_rate, str(self.selection)))
-        else:
-            comp = self.run_without_cross_validation(in_sample, out_of_sample)
-        if comp is None:
-            logger.info('Failed to run model signal')
-            self.model = None
-        else:
-            self.model = comp.model
-            self.signal = comp.signal
-
     def calculate_returns(self):
-        logger.info('Simulating strategy returns')
+        logger.info('Simulating portfolio')
         rtns = []
         signals = []
         for k, v in self.stock_returns.iteritems():
