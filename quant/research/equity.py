@@ -63,21 +63,22 @@ class MomentumSim(object):
         logger.info('Loading stock returns')
         r = stocks.load_google_stock_returns(self.start_date - relativedelta(years=1), self.end_date)
         self.stock_returns = r.loc[:, r.columns.isin(self.u.index)]
+        self.market_returns = r.mean(axis=1)
+        self.market_neutral_returns = self.stock_returns.subtract(self.market_returns, axis=0)
         self.asset_names = self.stock_returns.columns
         logger.info('Calculating volatility')
         w = self.stock_returns.resample('W').sum().abs()
         v = w[w > 0].rolling(52, min_periods=13).median().ffill().bfill().fillna(0.)
         v[v < STOCK_VOL_FLOOR] = STOCK_VOL_FLOOR
         self.stock_vol = v
-        self._r = self.stock_returns.cumsum().resample('W').last().diff()
+        self._r = self.market_neutral_returns.cumsum().resample('W').last().diff()
         self.v = tu.resample(v, self._r).ffill().bfill()
         self.r = self._r.divide(self.v)
         
     def create_estimation_data(self, depth):
         lookbacks = [3 ** (i+1) for i in xrange(depth)]
-        ans = dict([('S%d' % i, self.r.ewm(span=i).mean().shift(2)) for i in lookbacks])
-        ans['Rev'] = self.r.rolling(2, min_periods=1).mean()
-        ans['Vol'] = self.stock_vol
+        ans = dict([('L%d' % i, self._r.rolling(i).sum()) for i in xrange(1, depth+1)])
+        #ans = dict([('S%d' % i, self.r.ewm(span=i).mean().shift(2)) for i in lookbacks])
         return ans
 
     def estimate_model(self, x, timeline, asset_returns=None, model=None):
@@ -85,7 +86,7 @@ class MomentumSim(object):
                                                model=model, cross_validation_buckets=self.cross_validation_buckets)
 
     def build_model(self):
-        y = mu.get_score(self.r, 0, 1.5).shift(-1)[self.start_date:self.end_date]
+        y = self.r.shift(-1)[self.start_date:self.end_date]
         x = self.create_estimation_data(self.optimal_depth)
         self._model = self.estimate_model(x, y, asset_returns=y)
         self.model = self._model.model
