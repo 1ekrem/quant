@@ -25,8 +25,8 @@ class MomentumSim(object):
     '''
     Stocks strategy
     '''
-    def __init__(self, start_date, end_date, sample_date, universe, simulation_name, max_depth=5, model_path=MODEL_PATH, 
-                 load_model=False, cross_validation_buskcets=10, top=5, holding_period=4, long_only=True):
+    def __init__(self, start_date, end_date, sample_date, universe, simulation_name, max_depth=3, model_path=MODEL_PATH, 
+                 load_model=False, cross_validation_buskcets=10, top=4, holding_period=4, long_only=True):
         self.simulation_name = simulation_name
         self.start_date = start_date
         self.end_date = end_date
@@ -48,7 +48,7 @@ class MomentumSim(object):
         self.load_universe()
         self.load_stock_data()
         if self.load_model:
-            self.load_existing_model(self._r)
+            self.load_existing_model()
         if self.model is None:
             self.find_optimal_depth()
             self.build_model()
@@ -67,18 +67,21 @@ class MomentumSim(object):
         self.market_neutral_returns = self.stock_returns.subtract(self.market_returns, axis=0)
         self.asset_names = self.stock_returns.columns
         logger.info('Calculating volatility')
+        self._r = self.stock_returns.cumsum().resample('W').last().diff()
+        self._rs = self.market_neutral_returns.cumsum().resample('W').last().diff()
         w = self.stock_returns.resample('W').sum().abs()
         v = w[w > 0].rolling(52, min_periods=13).median().ffill().bfill().fillna(0.)
         v[v < STOCK_VOL_FLOOR] = STOCK_VOL_FLOOR
-        self.stock_vol = v
-        self._r = self.market_neutral_returns.cumsum().resample('W').last().diff()
-        self.v = tu.resample(v, self._r).ffill().bfill()
-        self.r = self._r.divide(self.v)
+        self.stock_vol = tu.resample(v, self._r).ffill().bfill()
+        self.r = self._r.divide(self.stock_vol)
+        self.rs = self._rs.divide(self.stock_vol)
         
     def create_estimation_data(self, depth):
-        lookbacks = [3 ** (i+1) for i in xrange(depth)]
-        ans = dict([('L%d' % i, self._r.rolling(i).sum()) for i in xrange(1, depth+1)])
-        #ans = dict([('S%d' % i, self.r.ewm(span=i).mean().shift(2)) for i in lookbacks])
+        lookbacks = [13, 26, 52][:depth]
+        ans = dict([('R%d' % i, self.r.shift(i)) for i in xrange(depth)])
+        ans.update(dict([('RS%d' % i, self.rs.shift(i)) for i in xrange(depth)]))
+        ans.update(dict([('M%d' % i, self.r.rolling(i, min_periods=8).mean().shift(3)) for i in lookbacks]))
+        ans.update(dict([('MS%d' % i, self.rs.rolling(i, min_periods=8).mean().shift(3)) for i in lookbacks]))
         return ans
 
     def estimate_model(self, x, timeline, asset_returns=None, model=None):
@@ -90,6 +93,7 @@ class MomentumSim(object):
         x = self.create_estimation_data(self.optimal_depth)
         self._model = self.estimate_model(x, y, asset_returns=y)
         self.model = self._model.model
+        self.error_rate = self.error_rates.loc[self.optimal_depth]
 
     def find_optimal_depth(self):
         y = self.r[self.start_date:self.end_date]
@@ -117,18 +121,21 @@ class MomentumSim(object):
             logger.info('Simulating portfolio')
             self._pos = calculate_signal_positions(self.signals[~self._r.isnull()], self.top, self.long_only)
             self.positions = tu.resample(self._pos.ffill(limit=self.holding_period).divide(self.stock_vol), self.stock_returns)
+            self.market_neutral_pnl = self.market_neutral_returns.mul(self.positions).sum(axis=1)[self.start_date:]
             self.pnl = self.stock_returns.mul(self.positions).sum(axis=1)[self.start_date:]
-            self.analytics = pu.get_returns_analytics(self.pnl.to_frame())
+            tmp = pd.concat([self.pnl, self.market_neutral_pnl], axis=1)
+            tmp.columns = ['PnL', 'Market Neutral']
+            self.analytics = pu.get_returns_analytics(tmp)
     
     def get_model_filename(self):
         return '%s%s.model' % (self.model_path, self.simulation_name)
 
-    def load_existing_model(self, timeline):
+    def load_existing_model(self):
         logger.info('Loading model %s' % self.simulation_name)
         filename = self.get_model_filename()
         load_data = load_pickle(filename)
         if load_data is not None:
-            self.optimal_depth, self.error_rate, model = load_data
+            self.optimal_depth, self.error_rate, self.model = load_data
 
     def pickle_model(self):
         filename = self.get_model_filename()
@@ -137,4 +144,11 @@ class MomentumSim(object):
             data = self.optimal_depth, self.error_rate, self.model
             write_pickle(data, filename)
 
-    
+    def plot(self):
+        acc = pd.concat([self.pnl.cumsum(), self.market_neutral_pnl.cumsum()], axis=1)
+        acc.columns = ['PnL (Sharpe: %.2f)' % self.analytics.loc['PnL', 'sharpe'],
+                       'Market Neutral (Sharpe: %.2f)' % self.analytics.loc['Market Neutral', 'sharpe']]
+        acc.plot()
+        plt.legend(loc='best', frameon=False)
+        
+        
