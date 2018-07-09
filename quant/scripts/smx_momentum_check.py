@@ -11,7 +11,9 @@ def load_smx_model():
 
 def plot_pnl(m):
     filename = os.path.expanduser('~/pnl.png')
-    acc = pd.concat([m.pnl, m.market_neutral_pnl, m.stock_returns.mean(axis=1)], axis=1)
+    mu = m.stock_returns.mean(axis=1)
+    mu *= tu.resample((1. / m.stock_vol).mean(axis=1), mu)
+    acc = pd.concat([m.pnl, m.market_neutral_pnl, mu], axis=1)
     acc.columns = ['PnL', 'Market Neutral', 'Index']
     acc[m.start_date:].cumsum().plot()
     plt.legend(loc='best', frameon=False)
