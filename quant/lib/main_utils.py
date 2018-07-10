@@ -3,23 +3,24 @@ Created on 22 Jun 2017
 
 @author: wayne
 '''
+import matplotlib
+matplotlib.use('Agg')
+
 import logging
 import os
 import smtplib
 import cPickle as pickle
 import pandas as pd
 import numpy as np
+from matplotlib import pyplot as plt
 from datetime import datetime as dt
 from dateutil.relativedelta import relativedelta
-from matplotlib import pyplot as plt
 from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
 from email.mime.base import MIMEBase
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 from email import encoders
-
-plt.ion()
 
 logging.basicConfig(format='%(asctime)s %(message)s')
 logger = logging.getLogger('quant')
