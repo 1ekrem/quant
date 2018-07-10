@@ -80,8 +80,10 @@ class MomentumSim(object):
         lookbacks = [13, 26, 52][:depth]
         ans = dict([('R%d' % i, self.r.shift(i)) for i in xrange(depth)])
         ans.update(dict([('RS%d' % i, self.rs.shift(i)) for i in xrange(depth)]))
-        ans.update(dict([('M%d' % i, self.r.rolling(i, min_periods=8).mean().shift(3)) for i in lookbacks]))
-        ans.update(dict([('MS%d' % i, self.rs.rolling(i, min_periods=8).mean().shift(3)) for i in lookbacks]))
+        ans.update(dict([('M%d' % i, self.r.rolling(i, min_periods=8).mean().shift(4)) for i in lookbacks]))
+        ans.update(dict([('MS%d' % i, self.rs.rolling(i, min_periods=8).mean().shift(4)) for i in lookbacks]))
+        ans.update(dict([('MT%d' % i, self.r.rolling(i, min_periods=8).mean().shift(3)) for i in lookbacks]))
+        ans.update(dict([('MTS%d' % i, self.rs.rolling(i, min_periods=8).mean().shift(3)) for i in lookbacks]))
         return ans
 
     def estimate_model(self, x, timeline, asset_returns=None, model=None):
@@ -96,7 +98,7 @@ class MomentumSim(object):
         self.error_rate = self.error_rates.loc[self.optimal_depth]
 
     def find_optimal_depth(self):
-        y = self.r[self.start_date:self.end_date]
+        y = self.r.shift(-1)[self.start_date:self.end_date]
         error_rates = pd.Series([])
         for depth in xrange(1, self.max_depth + 1):
             logger.info('Testing depth %d' % depth)
