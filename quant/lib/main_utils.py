@@ -3,16 +3,12 @@ Created on 22 Jun 2017
 
 @author: wayne
 '''
-import matplotlib
-matplotlib.use('Agg')
-
 import logging
 import os
 import smtplib
 import cPickle as pickle
 import pandas as pd
 import numpy as np
-from matplotlib import pyplot as plt
 from datetime import datetime as dt
 from dateutil.relativedelta import relativedelta
 from email.mime.multipart import MIMEMultipart

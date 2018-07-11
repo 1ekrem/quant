@@ -2,6 +2,7 @@ from quant.lib.main_utils import *
 from quant.data import stocks
 from quant.lib import timeseries_utils as tu, portfolio_utils as pu, \
     machine_learning_utils as mu
+from matplotlib import pyplot as plt
 
 STOCK_VOL_FLOOR = 0.02
 
@@ -75,6 +76,8 @@ class MomentumSim(object):
         self.stock_vol = tu.resample(v, self._r).ffill().bfill()
         self.r = self._r.divide(self.stock_vol)
         self.rs = self._rs.divide(self.stock_vol)
+        #self.r_clean = tu.get_clean_returns(self.r, 6.)
+        #self.rs_clean = tu.get_clean_returns(self.rs, 6.)
         
     def create_estimation_data(self, depth):
         lookbacks = [13, 26, 52][:depth]
@@ -91,14 +94,14 @@ class MomentumSim(object):
                                                model=model, cross_validation_buckets=self.cross_validation_buckets)
 
     def build_model(self):
-        y = self.r.shift(-1)[self.start_date:self.end_date]
+        y = mu.get_score(self.r, 0, 1.5).shift(-1)[self.start_date:self.end_date]
         x = self.create_estimation_data(self.optimal_depth)
         self._model = self.estimate_model(x, y, asset_returns=y)
         self.model = self._model.model
         self.error_rate = self.error_rates.loc[self.optimal_depth]
 
     def find_optimal_depth(self):
-        y = self.r.shift(-1)[self.start_date:self.end_date]
+        y = mu.get_score(self.r, 0, 1.5).shift(-1)[self.start_date:self.end_date]
         error_rates = pd.Series([])
         for depth in xrange(1, self.max_depth + 1):
             logger.info('Testing depth %d' % depth)

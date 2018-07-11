@@ -34,6 +34,13 @@ def remove_outliers(data, z=10, lookback=10, min_periods=5):
     return ans
 
 
+def get_clean_returns(r, threshold=4.):
+    ans = r.copy()
+    ans[r > threshold] = threshold
+    ans[r < -threshold] = -threshold
+    return ans
+    
+    
 def ts_interpolate(series):
     '''
     Create a zero observation when timeseries crosses the time axis
