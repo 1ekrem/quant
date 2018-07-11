@@ -44,10 +44,14 @@ def run_smx_check():
     mail = Email('wayne.cq@hotmail.com', ['wayne.cq@hotmail.com'], 'SMX ML')
     mail.add_date(dt.today())
     mail.add_image(filename, 600, 400)
+    table3 = np.round(pd.concat([m.pnl, m.market_neutral_pnl], axis=1).resample('W').sum(), 1)
+    table3.columns = ['PnL', 'Market Neutral PnL']
     table = m._pos.iloc[-1].dropna().sort_values().to_frame()
     table.index.name = 'Signal'
     table2 = np.round(m.positions.iloc[-1].dropna().sort_values().to_frame(), 1)
     table.index.name = 'Positions'
+    mail.add_text('PnL')
+    mail.add_table(table3, width=600)
     mail.add_text('Signal Positions')
     mail.add_table(table, width=400)
     mail.add_text('Current Positions')
