@@ -4,6 +4,9 @@ matplotlib.use('Agg')
 from quant.lib.main_utils import *
 from quant.research import equity
 from quant.lib import timeseries_utils as tu
+from matplotlib import pyplot as plt
+
+CAPITAL = 200.
 
 
 def load_smx_model():
@@ -44,11 +47,12 @@ def run_smx_check():
     mail = Email('wayne.cq@hotmail.com', ['wayne.cq@hotmail.com'], 'SMX ML')
     mail.add_date(dt.today())
     mail.add_image(filename, 600, 400)
-    table3 = np.round(pd.concat([m.pnl, m.market_neutral_pnl], axis=1).resample('W').sum(), 1)
+    table3 = np.round(CAPITAL * pd.concat([m.pnl, m.market_neutral_pnl], axis=1).resample('W').sum(), 0).iloc[-13:]
     table3.columns = ['PnL', 'Market Neutral PnL']
+    table3.index = table3.index.strftime('%Y-%m-%d')
     table = m._pos.iloc[-1].dropna().sort_values().to_frame()
     table.index.name = 'Signal'
-    table2 = np.round(m.positions.iloc[-1].dropna().sort_values().to_frame(), 1)
+    table2 = np.round(CAPITAL * m.positions.iloc[-1].dropna().sort_values().to_frame(), 0)
     table.index.name = 'Positions'
     mail.add_text('PnL')
     mail.add_table(table3, width=600)
