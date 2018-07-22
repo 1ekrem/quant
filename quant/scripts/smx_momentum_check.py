@@ -18,10 +18,8 @@ def load_smx_model():
 
 def plot_pnl(m):
     filename = os.path.expanduser('~/pnl.png')
-    mu = m.stock_returns.mean(axis=1)
-    mu *= tu.resample((1. / m.stock_vol).mean(axis=1), mu)
-    acc = pd.concat([m.pnl, m.market_neutral_pnl, mu], axis=1)
-    acc.columns = ['PnL', 'Market Neutral', 'Index']
+    acc = pd.concat([m.pnl, m.alpha.Alpha, m.market_returns], axis=1)
+    acc.columns = ['PnL', 'Alpha', 'Index']
     acc[m.start_date:].cumsum().plot()
     plt.legend(loc='best', frameon=False)
     plt.tight_layout()
@@ -47,8 +45,8 @@ def run_smx_check():
     mail = Email('wayne.cq@hotmail.com', ['wayne.cq@hotmail.com'], 'SMX ML')
     mail.add_date(dt.today())
     mail.add_image(filename, 600, 400)
-    table3 = np.round(CAPITAL * pd.concat([m.pnl, m.market_neutral_pnl], axis=1).resample('W').sum(), 0).iloc[-13:]
-    table3.columns = ['PnL', 'Market Neutral PnL']
+    table3 = np.round(CAPITAL * pd.concat([m.pnl, m.alpha.Alpha], axis=1).resample('W').sum(), 0).iloc[-13:]
+    table3.columns = ['PnL', 'Alpha']
     table3.index = table3.index.strftime('%Y-%m-%d')
     table = m._pos.iloc[-1].dropna().sort_values().to_frame()
     table.index.name = 'Signal'

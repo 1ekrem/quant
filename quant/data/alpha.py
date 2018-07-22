@@ -63,8 +63,8 @@ def calculate_uk_alpha(lookback=5, latest=False):
                     estimate_alpha(yy, x[start:end], idx, UK_ALPHA)
 
 
-def load_alpha(start_date=None, end_date=None, data_table=UK_ALPHA):
-    data = stocks.load_google_returns(start_date, end_date, 'Alpha', data_table)
+def load_alpha(start_date=None, end_date=None, data_table=UK_ALPHA, data_name='Alpha'):
+    data = stocks.load_google_returns(start_date, end_date, data_name, data_table)
     data.columns = pd.MultiIndex.from_tuples([tuple(x.split('|')) for x in data.columns], names=['Factor', 'Stock'])
     return data
         
