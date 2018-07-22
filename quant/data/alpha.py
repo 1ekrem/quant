@@ -12,17 +12,21 @@ def create_alpha_table():
     du.create_t2_timeseries_table(DATABASE_NAME, UK_ALPHA)
 
 
-def get_alpha(y, x):
+def get_alpha(y, x, min_periods=63):
     my_y = y.dropna()
     my_x = sm.add_constant(x.loc[my_y.index].fillna(0.))
-    lm = sm.OLS(my_y, my_x).fit()
-    p = lm.pvalues
-    p = p.loc[p.index != 'const']
-    b = lm.params.loc[p.index]
-    b[p > .05] *= 0.
-    f = my_x.loc[:, p.index].mul(b, axis=1)
+    if len(my_y) >= min_periods:
+        lm = sm.OLS(my_y, my_x).fit()
+        p = lm.pvalues
+        p = p.loc[p.index != 'const']
+        b = lm.params.loc[p.index]
+        b[p > .05] *= 0.
+    else:
+        b = pd.Series([0.] * len(x.columns), index=x.columns)
+    f = my_x.loc[:, b.index].mul(b, axis=1)
     s = my_y - f.sum(axis=1)
     return b, f, s
+        
 
 
 def estimate_alpha(y, x, stock, data_table):
@@ -53,8 +57,10 @@ def calculate_uk_alpha(lookback=5, latest=False):
             for i in xrange(first -1, len(ms)):
                 end = me.index[i]
                 start = ms.index[np.max([0, i - lookback + 1])]
-                logger.info('Calculating %s %d-%d' % (idx, start.year, end.year))
-                estimate_alpha(my_y[start:end], x[start:end], idx, UK_ALPHA)
+                yy = my_y[start:end].dropna()
+                if len(yy) > 20:
+                    logger.info('Calculating %s %d-%d' % (idx, start.year, end.year))
+                    estimate_alpha(yy, x[start:end], idx, UK_ALPHA)
 
 
 def load_alpha(start_date=None, end_date=None, data_table=UK_ALPHA):
