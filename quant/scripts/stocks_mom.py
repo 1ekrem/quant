@@ -61,7 +61,8 @@ def plot(rtns, vol, posvol):
 
 def get_smx_data():
     u = stocks.get_ftse_smx_universe()
-    r = stocks.load_google_stock_returns(data_name='Returns')
+    r = stocks.load_google_returns(data_name='Returns', data_table=stocks.UK_STOCKS)
+    r = r.loc[:, r.columns.isin(u.index)]
     r = r.resample('W').sum()
     v = r.abs().rolling(52, min_periods=13).median()
     v2 = v.copy()

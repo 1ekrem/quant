@@ -194,14 +194,17 @@ def get_cross_validation_buckets(data_size, buckets):
     return ans
 
 
-def RandomBoosting(x, y, forest_size=100, estimate_intercept=True, no_of_variables=None, *args, **kwargs):
+def RandomBoosting(x, y, forest_size=300, estimate_intercept=True, no_of_variables=None, *args, **kwargs):
     '''
     Random forest on top of boosting
     Returns a list of tuples of (randomization, boosting model)
     '''
     myx, _ = give_me_pandas_variables(x, y)
     sequence = get_random_sequence(np.size(myx, 1), forest_size)
-    return [(seq, BoostingStump(myx.iloc[:, seq], y, estimate_intercept, no_of_variables)) for seq in sequence]
+    ans = []
+    for seq in sequence:
+        ans.append((seq, BoostingStump(myx.iloc[:, seq], y, estimate_intercept, no_of_variables)))
+    return ans
     
 
 # Prediction

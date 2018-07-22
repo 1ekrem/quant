@@ -62,12 +62,13 @@ class MomentumSim(object):
 
     def load_stock_data(self):
         logger.info('Loading stock returns')
-        r = stocks.load_google_stock_returns(self.start_date - relativedelta(years=1), self.end_date)
+        r = stocks.load_google_returns(self.start_date - relativedelta(years=1), self.end_date, data_table=stocks.UK_STOCKS)
+        vm = stocks.load_google_returns(self.start_date - relativedelta(years=1), self.end_date, 'Volume', data_table=stocks.UK_STOCKS)
         self.stock_returns = r.loc[:, r.columns.isin(self.u.index)]
+        self.stock_volume = vm.loc[:, self.stock_returns.columns]
         self.market_returns = r.mean(axis=1)
         self.market_neutral_returns = self.stock_returns.subtract(self.market_returns, axis=0)
         self.asset_names = self.stock_returns.columns
-        logger.info('Calculating volatility')
         self._r = self.stock_returns.cumsum().resample('W').last().diff()
         self._rs = self.market_neutral_returns.cumsum().resample('W').last().diff()
         w = self.stock_returns.resample('W').sum().abs()
@@ -76,17 +77,27 @@ class MomentumSim(object):
         self.stock_vol = tu.resample(v, self._r).ffill().bfill()
         self.r = self._r.divide(self.stock_vol)
         self.rs = self._rs.divide(self.stock_vol)
-        #self.r_clean = tu.get_clean_returns(self.r, 6.)
-        #self.rs_clean = tu.get_clean_returns(self.rs, 6.)
+        #vv = self.stock_volume.rolling(252, min_periods=63).std()
+        #self.vl = self.stock_volume.divide(vv[vv > 0].ffill().bfill())
+        #self.vs = self.vl.mul(np.sign(self.stock_returns))
         
     def create_estimation_data(self, depth):
         lookbacks = [13, 26, 52][:depth]
-        ans = dict([('R%d' % i, self.r.shift(i)) for i in xrange(depth)])
-        ans.update(dict([('RS%d' % i, self.rs.shift(i)) for i in xrange(depth)]))
-        ans.update(dict([('M%d' % i, self.r.rolling(i, min_periods=8).mean().shift(4)) for i in lookbacks]))
-        ans.update(dict([('MS%d' % i, self.rs.rolling(i, min_periods=8).mean().shift(4)) for i in lookbacks]))
-        ans.update(dict([('MT%d' % i, self.r.rolling(i, min_periods=8).mean().shift(3)) for i in lookbacks]))
-        ans.update(dict([('MTS%d' % i, self.rs.rolling(i, min_periods=8).mean().shift(3)) for i in lookbacks]))
+        ans = {}
+        for data_name, data in [('R', self.r), ('RS', self.rs)]:
+            ans.update(dict([('%s%d' % (data_name, i), data.shift(i)) for i in xrange(depth)]))
+            ans.update(dict([('M%s%d' % (data_name, i), data.rolling(i, min_periods=8).mean().shift(4)) for i in lookbacks]))
+            ans.update(dict([('T%s%d' % (data_name, i), data.rolling(i, min_periods=8).mean().shift(3)) for i in lookbacks]))
+        
+        #lookbacks2 = [4, 13, 26][:depth]
+        #ans = dict([('R%d' % i, self.r.shift(i)) for i in xrange(depth)])
+        #ans.update(dict([('RS%d' % i, self.rs.shift(i)) for i in xrange(depth)]))
+        #ans.update(dict([('M%d' % i, self.r.rolling(i, min_periods=8).mean().shift(4)) for i in lookbacks]))
+        #ans.update(dict([('MS%d' % i, self.rs.rolling(i, min_periods=8).mean().shift(4)) for i in lookbacks]))
+        #ans.update(dict([('MT%d' % i, self.r.rolling(i, min_periods=8).mean().shift(3)) for i in lookbacks]))
+        #ans.update(dict([('MTS%d' % i, self.rs.rolling(i, min_periods=8).mean().shift(3)) for i in lookbacks]))
+        #for data_name, data in [('V', self.vl), ('VS', self.vs)]:
+        #    ans.update(dict([('%s%d' % (data_name, i), data.diff().ewm(span=i).mean()) for i in lookbacks2]))
         return ans
 
     def estimate_model(self, x, timeline, asset_returns=None, model=None):
@@ -95,6 +106,7 @@ class MomentumSim(object):
 
     def build_model(self):
         y = mu.get_score(self.r, 0, 1.5).shift(-1)[self.start_date:self.end_date]
+        #y = y[y.abs() > 0.2]
         x = self.create_estimation_data(self.optimal_depth)
         self._model = self.estimate_model(x, y, asset_returns=y)
         self.model = self._model.model
@@ -102,6 +114,7 @@ class MomentumSim(object):
 
     def find_optimal_depth(self):
         y = mu.get_score(self.r, 0, 1.5).shift(-1)[self.start_date:self.end_date]
+        #y = y[y.abs() > 0.2]
         error_rates = pd.Series([])
         for depth in xrange(1, self.max_depth + 1):
             logger.info('Testing depth %d' % depth)
