@@ -134,7 +134,7 @@ class MomentumSim(object):
             self.positions = tu.resample(self._pos.ffill(limit=self.holding_period).divide(self.stock_vol), self.stock_returns)
             self.pnl = self.stock_returns.mul(self.positions).sum(axis=1)[self.start_date:]
             self.pnl.name = 'PnL'
-            self.alpha = self.stock_alpha.mul(self.positions).sum(level=1, axis=1).groupby(axis=1, level=0).sum()[self.start_date:]
+            self.alpha = self.stock_alpha.mul(self.positions, level=1, axis=1).groupby(axis=1, level=0).sum()[self.start_date:]
             tmp = pd.concat([self.pnl, self.alpha], axis=1)
             self.analytics = pu.get_returns_analytics(tmp)
     
@@ -156,9 +156,8 @@ class MomentumSim(object):
             write_pickle(data, filename)
 
     def plot(self):
-        acc = pd.concat([self.pnl.cumsum(), self.market_neutral_pnl.cumsum()], axis=1)
-        acc.columns = ['PnL (Sharpe: %.2f)' % self.analytics.loc['PnL', 'sharpe'],
-                       'Market Neutral (Sharpe: %.2f)' % self.analytics.loc['Market Neutral', 'sharpe']]
+        acc = pd.concat([self.pnl.cumsum(), self.alpha.cumsum()], axis=1)
+        acc.columns = ['%s (Sharpe: %.2f)' % (x, self.analytics.loc[x, 'sharpe']) for x in acc.columns]
         acc.plot()
         plt.legend(loc='best', frameon=False)
         

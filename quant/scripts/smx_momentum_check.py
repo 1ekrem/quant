@@ -18,7 +18,8 @@ def load_smx_model():
 
 def plot_pnl(m):
     filename = os.path.expanduser('~/pnl.png')
-    acc = pd.concat([m.pnl, m.alpha.Alpha, m.market_returns], axis=1)
+    mu = m.positions.abs().sum(axis=1).mean()
+    acc = pd.concat([m.pnl, m.alpha.Alpha, mu * m.market_returns], axis=1)
     acc.columns = ['PnL', 'Alpha', 'Index']
     acc[m.start_date:].cumsum().plot()
     plt.legend(loc='best', frameon=False)

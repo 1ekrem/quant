@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 from datetime import datetime as dt
 from matplotlib import pyplot as plt
+from scipy import stats as ss
 from quant.lib import timeseries_utils as tu
 from quant.lib.main_utils import logger
 
@@ -133,3 +134,14 @@ def highlight_last_observation(data, color='green'):
     plt.axhline(data.values[-1], color=color)
     txt = '%s: %.2f' % (data.index[-1].strftime('%b %d, %Y'), data.values[-1])
     plt.text(data.index[-1], data.values[-1], txt, va='bottom', ha='right')
+    
+
+def binned_statistic_plot(x, y, z, statistic='mean', bins=None, range=None):
+    s, xe, ye, bn = ss.binned_statistic_2d(x, y, z, statistic)
+    plt.imshow(s.T[::-1], cmap='Greens')
+    xt = .5 * (xe[1:] + xe[:-1])
+    yt = .5 * (ye[1:] + ye[:-1])[::-1]
+    plt.xticks(np.arange(len(xt)), np.round(xt, 1))
+    plt.yticks(np.arange(len(yt)), np.round(yt, 1))
+    
+    
