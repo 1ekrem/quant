@@ -58,22 +58,38 @@ def load_google_prices(ticker, exchange='LON', period='1Y'):
     return gc.get_price_data(param)
 
 
+def save_data(data, ticker, data_table, load_volume):
+    data = data.resample('B').last()
+    data = data.loc[data.Close > 1e-2]
+    r = np.log(data.Close).diff().dropna()
+    r.name = ticker
+    tu.store_timeseries(r, DATABASE_NAME, data_table, 'Returns')
+    if load_volume:
+        v = (data.Close * data.Volume / 1e6).dropna()
+        v.name = ticker
+        tu.store_timeseries(v, DATABASE_NAME, data_table, 'Volume')
+
+
 def import_google_prices(ticker, exchange='LON', period='1Y', data_table=UK_STOCKS, load_volume=True):
     logger.info('Loading %s' % ticker)
     data = load_google_prices(ticker, exchange, period)
     if data.empty:
         logger.info('Data not found')
     else:
-        data = data.resample('B').last()
-        data = data.loc[data.Close > 1e-2]
-        r = np.log(data.Close).diff().dropna()
-        r.name = ticker
-        tu.store_timeseries(r, DATABASE_NAME, data_table, 'Returns')
-        if load_volume:
-            v = (data.Close * data.Volume / 1e6).dropna()
-            v.name = ticker
-            tu.store_timeseries(v, DATABASE_NAME, data_table, 'Volume')
+        save_data(data, ticker, data_table, load_volume)
 
+
+def import_saved_stock_prices():
+    filename = os.path.expanduser('~/TempWork/scripts/stocks.xlsx')
+    ff = pd.ExcelFile(filename)
+    ans = {}
+    for stock in ff.sheet_names:
+        logger.info('Importing %s' % stock)
+        data = ff.parse(stock)
+        data.index = data.Date
+        data['Close'] = data['Adj Close']
+        save_data(data, stock, UK_STOCKS, True)
+        
 
 def import_ftse250_index_prices(period='1M'):
     import_google_prices('MCX', 'INDEXFTSE', period, GLOBAL_ASSETS, load_volume=False)
@@ -91,8 +107,10 @@ def import_smx_google_prices(period='1M'):
         import_google_prices(idx, 'LON', period, UK_STOCKS)
 
 
-def import_ftse250_google_prices(period='1M'):
-    u = get_ftse250_universe()
+def import_uk_google_prices(period='1M'):
+    u = get_ftse_smx_universe()
+    u2 = get_ftse250_universe()
+    u = pd.concat([u, u2.loc[~u2.index.isin(u.index)]], axis=0)
     for idx in u.index:
         import_google_prices(idx, 'LON', period, UK_STOCKS)
 

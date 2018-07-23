@@ -70,7 +70,7 @@ class MomentumSim(object):
         self.stock_volume = vm.loc[:, self.stock_returns.columns]
         self.stock_alpha = a.loc[:, a.columns.get_level_values(1).isin(self.u.index)]
         self.market_returns = rm.loc[:, 'MCX']
-        self.market_neutral_returns = self.stock_alpha.loc[:, self.stock_alpha.columns.get_level_values(0) == 'Alpha']
+        self.market_neutral_returns = self.stock_alpha.loc[:, self.stock_alpha.columns.get_level_values(0) == 'Alpha'].groupby(axis=1, level=1).sum()
         self.market_neutral_returns = self.market_neutral_returns.loc[:, self.stock_returns.columns]
         self.asset_names = self.stock_returns.columns
         self._r = self.stock_returns.cumsum().resample('W').last().diff()
@@ -88,8 +88,8 @@ class MomentumSim(object):
     def create_estimation_data(self, depth):
         lookbacks = [13, 26, 52][:depth]
         ans = {}
-        for data_name, data in [('R', self.r), ('RS', self.rs)]:
-        #for data_name, data in [('RS', self.rs)]:
+        #for data_name, data in [('R', self.r), ('RS', self.rs)]:
+        for data_name, data in [('RS', self.rs)]:
             ans.update(dict([('%s%d' % (data_name, i), data.shift(i)) for i in xrange(depth)]))
             ans.update(dict([('M%s%d' % (data_name, i), data.rolling(i, min_periods=8).mean().shift(4)) for i in lookbacks]))
             ans.update(dict([('T%s%d' % (data_name, i), data.rolling(i, min_periods=8).mean().shift(3)) for i in lookbacks]))

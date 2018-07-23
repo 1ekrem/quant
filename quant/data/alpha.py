@@ -40,14 +40,17 @@ def estimate_alpha(y, x, stock, data_table):
     tu.store_timeseries(pd.concat([f, s], axis=1), DATABASE_NAME, data_table, 'Alpha')
 
 
-def calculate_uk_alpha(lookback=5, latest=False):
+def calculate_uk_alpha(lookback=5, latest=False, ids=None):
     u = stocks.get_ftse250_universe()
     u2 = stocks.get_ftse_smx_universe()
     u = pd.concat([u, u2.loc[~u2.index.isin(u.index)]], axis=0)
     x = stocks.load_google_returns(data_table=stocks.GLOBAL_ASSETS)
     x = x.loc[:, x.columns.isin(UK_BETA_FACTORS)]
     y = stocks.load_google_returns(data_table=stocks.UK_STOCKS)
-    y = y.loc[:, y.columns.isin(u.index)]
+    if ids is not None:
+        y = y.loc[:, y.columns.isin(ids)]
+    else:
+        y = y.loc[:, y.columns.isin(u.index)]
     for idx in y.columns:
         my_y = y[idx].dropna()
         if not my_y.empty:
