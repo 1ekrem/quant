@@ -39,7 +39,7 @@ def run_smx_check(capital=500 * 1.9):
     sig.to_csv(fname)
     pnl_idx = capital * r.mean(axis=1)
     table = np.round(100. * pd.concat([pnl, pnl2, pnl_idx], axis=1).iloc[-6:], 2)
-    table.columns = ['Mom PnL (%)', 'Rev PnL (%)', 'Index PnL (%)']
+    table.columns = ['Slow PnL (%)', 'Fast PnL (%)', 'Index PnL (%)']
     table.index = [x.strftime('%Y-%m-%d') for x in table.index]
     table2 = np.round(pos[pos > 0].to_frame())
     table3 = np.round(pos2[pos2 > 0].to_frame())
@@ -49,9 +49,9 @@ def run_smx_check(capital=500 * 1.9):
     mail.add_image(filename, 600, 400)
     mail.add_text('PnL Summary', bold=True)
     mail.add_table(table, width=600)
-    mail.add_text('Momentum Positions')
+    mail.add_text('Slow Positions')
     mail.add_table(table2, width=400)
-    mail.add_text('Reversal Positions')
+    mail.add_text('Fast Positions')
     mail.add_table(table3, width=400)
     mail.add_attachment(fname)
     mail.send_email()

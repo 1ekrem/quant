@@ -27,8 +27,8 @@ def resample(ts, timeline, carry_forward=True):
     return ts.loc[timeline.index]
 
 
-def remove_outliers(data, z=10, lookback=10, min_periods=5):
-    x = (data - data.rolling(lookback, min_periods=min_periods).median()) / data.diff().std()
+def remove_outliers(data, z=15):
+    x = data / data.std()
     ans = data.copy()
     ans[x.abs()>=z] = np.nan
     return ans

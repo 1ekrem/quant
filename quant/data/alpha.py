@@ -33,14 +33,14 @@ def estimate_alpha(y, x, stock, data_table):
     b, f, s = get_alpha(y, x)
     b.index = ['%s|%s' % (idx, stock) for idx in b.index]
     b = b.to_frame().T
-    b.index = [y.index[-1]]
+    b.index = [y.index[0]]
     tu.store_timeseries(b, DATABASE_NAME, data_table, 'Beta')
     s.name = 'Alpha|%s' % stock
     f.columns = ['%s|%s' % (idx, stock) for idx in f.columns]
     tu.store_timeseries(pd.concat([f, s], axis=1), DATABASE_NAME, data_table, 'Alpha')
 
 
-def calculate_uk_alpha(lookback=5, latest=False, ids=None):
+def calculate_uk_alpha(lookback=3, latest=False, ids=None):
     u = stocks.get_ftse250_universe()
     u2 = stocks.get_ftse_smx_universe()
     u = pd.concat([u, u2.loc[~u2.index.isin(u.index)]], axis=0)

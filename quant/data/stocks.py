@@ -62,6 +62,7 @@ def save_data(data, ticker, data_table, load_volume):
     data = data.resample('B').last()
     data = data.loc[data.Close > 1e-2]
     r = np.log(data.Close).diff().dropna()
+    r = tu.remove_outliers(r)
     r.name = ticker
     tu.store_timeseries(r, DATABASE_NAME, data_table, 'Returns')
     if load_volume:

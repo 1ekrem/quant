@@ -9,6 +9,8 @@ from quant.lib import portfolio_utils as pu
 from quant.data import stocks
 from datetime import datetime as dt
 
+STOCK_VOL_FLOOR = 0.02
+
 
 def get_top_3(x):
     ans = np.nan * x
@@ -25,28 +27,28 @@ def get_clean_returns(rtns):
     return r
 
 
-def get_momentum(rtns, vol, mom):
-    return get_clean_returns(rtns).rolling(mom, min_periods=1).sum() / vol / np.sqrt(mom)
-
-
 def get_signal_1(rtns, vol):
     '''
-    Momentum
+    Reversal
     '''
-    s1 = get_momentum(rtns, vol, 3)
-    s2 = get_momentum(rtns, vol, 52).shift(3)
-    sig = s2 - s1
-    return sig.apply(get_top_3, axis=1)
+    r = rtns.divide(vol)
+    rm = r.subtract(r.mean(axis=1), axis=0)
+    s1 = rm.rolling(3).mean()
+    s2 = rm.rolling(52, min_periods=13).mean().shift(3)
+    sig = 1. * ((s1 <= -.6) & (s2 >= .4))
+    return sig[sig.abs() > 0]
 
 
 def get_signal_2(rtns, vol):
     '''
     Reversal
     '''
-    s1 = get_momentum(rtns, vol, 2)
-    s2 = get_momentum(rtns, vol, 26).shift(2)
-    sig = .3 * s2 - s1
-    return sig.apply(get_top_3, axis=1)
+    r = rtns.divide(vol)
+    rm = r.subtract(r.mean(axis=1), axis=0)
+    s1 = rm
+    s2 = rm.rolling(52, min_periods=13).mean().shift()
+    sig = 1. * ((s1 <= -2.) & (s2 >= .3))
+    return sig[sig.abs() > 0]
 
 
 def get_pnl(sig, rtns, vol):
@@ -55,7 +57,7 @@ def get_pnl(sig, rtns, vol):
     
 
 def plot(rtns, vol, posvol):
-    sig = get_signal_1(rtns, vol)
+    sig = get_signal_2(rtns, vol)
     get_pnl(sig, rtns, posvol).cumsum().plot()
 
 
@@ -64,9 +66,10 @@ def get_smx_data():
     r = stocks.load_google_returns(data_name='Returns', data_table=stocks.UK_STOCKS)
     r = r.loc[:, r.columns.isin(u.index)]
     r = r.resample('W').sum()
-    v = r.abs().rolling(52, min_periods=13).median()
+    w = r.abs()
+    v = w[w > 0].rolling(52, min_periods=13).median().ffill().bfill()
     v2 = v.copy()
-    v2[v2 < .03] = .03
+    v2[v2 < STOCK_VOL_FLOOR] = STOCK_VOL_FLOOR
     return r.loc[:, u.index], v.loc[:, u.index], v2.loc[:, u.index]
 
 
@@ -80,7 +83,10 @@ def run_new_smx(r, v, posvol, capital=500):
     pos2 = (1. / posvol)[pos2 > 0].ffill(limit=4)
     pnl = get_clean_returns(r).mul(pos.shift()).sum(axis=1)
     pnl2 = get_clean_returns(r).mul(pos2.shift()).sum(axis=1)
-    sig = pd.concat([get_momentum(r, v, 2).iloc[-1], get_momentum(r, v, 52).shift(2).iloc[-1], capital / posvol.iloc[-1]], axis=1)
+    rtn = r.divide(v)
+    s1 = rtn.rolling(3).mean()
+    s2 = rtn.rolling(52, min_periods=13).mean().shift(3)
+    sig = pd.concat([s1.iloc[-1], s2.iloc[-1], capital / posvol.iloc[-1]], axis=1)
     sig.columns = ['Reversal', 'M52', 'Position']
     sig = sig.sort_values('M52', ascending=False)
     sig = sig.dropna()

@@ -21,7 +21,6 @@ def calculate_signal_positions(signal, top=5, long_only=True):
     return signal.apply(calc, axis=1)
 
 
-# Simulations
 class MomentumSim(object):
     '''
     Stocks strategy
@@ -63,36 +62,38 @@ class MomentumSim(object):
     def load_stock_data(self):
         logger.info('Loading stock returns')
         r = stocks.load_google_returns(self.start_date - relativedelta(years=1), self.end_date, data_table=stocks.UK_STOCKS)
-        rm = stocks.load_google_returns(self.start_date - relativedelta(years=1), self.end_date, data_table=stocks.GLOBAL_ASSETS)
+        rx = stocks.load_google_returns(self.start_date - relativedelta(years=1), self.end_date, data_table=stocks.GLOBAL_ASSETS)
         vm = stocks.load_google_returns(self.start_date - relativedelta(years=1), self.end_date, 'Volume', data_table=stocks.UK_STOCKS)
         a = alpha.load_alpha(self.start_date - relativedelta(years=1), self.end_date, data_table=alpha.UK_ALPHA)
+        self.market_returns = rx.loc[:, 'MCX']
         self.stock_returns = r.loc[:, r.columns.isin(self.u.index)]
-        self.stock_volume = vm.loc[:, self.stock_returns.columns]
-        self.stock_alpha = a.loc[:, a.columns.get_level_values(1).isin(self.u.index)]
-        self.market_returns = rm.loc[:, 'MCX']
-        self.market_neutral_returns = self.stock_alpha.loc[:, self.stock_alpha.columns.get_level_values(0) == 'Alpha'].groupby(axis=1, level=1).sum()
-        self.market_neutral_returns = self.market_neutral_returns.loc[:, self.stock_returns.columns]
         self.asset_names = self.stock_returns.columns
-        self._r = self.stock_returns.cumsum().resample('W').last().diff()
-        self._rs = self.market_neutral_returns.cumsum().resample('W').last().diff()
+        self.stock_alpha = a.loc[:, a.columns.get_level_values(1).isin(self.u.index)]
+        alpha_returns = a.loc[:, a.columns.get_level_values(0) == 'Alpha']
+        alpha_returns = alpha_returns.groupby(level=1, axis=1).sum().loc[:, self.asset_names]
+        self.stock_volume = vm.loc[:, self.stock_returns.columns]
+        self._r = self.stock_returns.cumsum().ffill(limit=5).resample('W').last().diff()
+        self._rs = alpha_returns.cumsum().ffill(limit=5).resample('W').last().diff()
         w = self.stock_returns.resample('W').sum().abs()
-        v = w[w > 0].rolling(52, min_periods=13).median().ffill().bfill().fillna(0.)
-        v[v < STOCK_VOL_FLOOR] = STOCK_VOL_FLOOR
-        self.stock_vol = tu.resample(v, self._r).ffill().bfill()
-        self.r = self._r.divide(self.stock_vol)
-        self.rs = self._rs.divide(self.stock_vol)
+        v = w[w > 0].rolling(52, min_periods=13).median().ffill().bfill()
+        self.stock_vol = tu.resample(v, self._r)
+        self.stock_vol[self.stock_vol < STOCK_VOL_FLOOR] = STOCK_VOL_FLOOR
+        self.r = self._r.divide(v)
+        self.rs = self._rs.divide(v)
+        self.rm = self.rs.subtract(self.rs.mean(axis=1), axis=0)
         #vv = self.stock_volume.rolling(252, min_periods=63).std()
         #self.vl = self.stock_volume.divide(vv[vv > 0].ffill().bfill())
         #self.vs = self.vl.mul(np.sign(self.stock_returns))
         
     def create_estimation_data(self, depth):
-        lookbacks = [13, 26, 52][:depth]
+        #lookbacks = [13, 26, 52][:depth]
+        #lookbacks = [3, 6, 9][:depth]
+        lookbacks = np.arange(depth) + 1
         ans = {}
-        #for data_name, data in [('R', self.r), ('RS', self.rs)]:
-        for data_name, data in [('RS', self.rs)]:
-            ans.update(dict([('%s%d' % (data_name, i), data.shift(i)) for i in xrange(depth)]))
-            ans.update(dict([('M%s%d' % (data_name, i), data.rolling(i, min_periods=8).mean().shift(4)) for i in lookbacks]))
-            ans.update(dict([('T%s%d' % (data_name, i), data.rolling(i, min_periods=8).mean().shift(3)) for i in lookbacks]))
+       # for data_name, data in [('R', self.r), ('RS', self.rs)]:
+        for data_name, data in [('RM', self.rm)]:
+            ans.update(dict([('%s%d' % (data_name, i), data.rolling(i).mean()) for i in lookbacks]))
+            ans.update(dict([('M%s%d' % (data_name, i), data.rolling(52, min_periods=13).mean().shift(i)) for i in lookbacks]))
         return ans
 
     def estimate_model(self, x, timeline, asset_returns=None, model=None):
@@ -100,14 +101,14 @@ class MomentumSim(object):
                                                model=model, cross_validation_buckets=self.cross_validation_buckets)
 
     def build_model(self):
-        y = mu.get_score(self.r, 0, 1.5).shift(-1)[self.start_date:self.end_date]
+        y = mu.get_score(self.rs, 0, 1.5).shift(-1)[self.start_date:self.end_date]
         x = self.create_estimation_data(self.optimal_depth)
         self._model = self.estimate_model(x, y, asset_returns=y)
         self.model = self._model.model
         self.error_rate = self.error_rates.loc[self.optimal_depth]
 
     def find_optimal_depth(self):
-        y = mu.get_score(self.r, 0, 1.5).shift(-1)[self.start_date:self.end_date]
+        y = mu.get_score(self.rs, 0, 1.5).shift(-1)[self.start_date:self.end_date]
         error_rates = pd.Series([])
         for depth in xrange(1, self.max_depth + 1):
             logger.info('Testing depth %d' % depth)
@@ -160,5 +161,5 @@ class MomentumSim(object):
         acc.columns = ['%s (Sharpe: %.2f)' % (x, self.analytics.loc[x, 'sharpe']) for x in acc.columns]
         acc.plot()
         plt.legend(loc='best', frameon=False)
-        
+    
         
