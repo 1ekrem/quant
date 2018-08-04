@@ -17,14 +17,15 @@ def run_long(r, vol, pos_vol, i):
             if p.sum(axis=1).sum() > 0:
                 p = p[p > 0].ffill(limit=3).divide(pos_vol)
                 g = p.abs().sum(axis=1)
-                pnl = r.mul(p.shift()).sum(axis=1)[dt(2010,1,1):]
-                pnl /= g.shift()[dt(2010,1,1):]
+                pnl = r.mul(p.shift()).sum(axis=1)[dt(2009,1,1):]
+                pnl /= g.shift()[dt(2009,1,1):]
                 pnl = pnl.fillna(0.)
                 sr = pnl.mean() / pnl.std() * np.sqrt(52.)
+                mu = pnl.mean() * 52.
                 tot = pnl.sum()
-                if tot > tlong:
-                    pnl.name = '%d %.2f [%.1f %.1f]' % (i, sr, high, -low)
-                    tlong = tot
+                if sr > tlong:
+                    pnl.name = '%d %.2f %.1f%% [%.1f %.1f]' % (i, sr, 100. * mu, high, -low)
+                    tlong = sr
                     slong = pnl.cumsum().ffill()
     return slong
     

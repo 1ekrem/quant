@@ -55,7 +55,11 @@ def import_ftse250_tickers():
 # Google prices
 def load_google_prices(ticker, exchange='LON', period='1Y'):
     param = {'q': ticker, 'i': '86400', 'x': exchange, 'p': period}
-    return gc.get_price_data(param)
+    try:
+        return gc.get_price_data(param)
+    except Exception as e:
+        logger.warn('Failed: %s' % str(e))
+        return pd.DataFrame([])
 
 
 def save_data(data, ticker, data_table, load_volume):
