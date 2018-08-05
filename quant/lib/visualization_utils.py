@@ -136,12 +136,16 @@ def highlight_last_observation(data, color='green'):
     plt.text(data.index[-1], data.values[-1], txt, va='bottom', ha='right')
     
 
-def binned_statistic_plot(x, y, z, statistic='mean', bins=None, range=None):
+def binned_statistic_plot(x, y, statistic='mean', bins=None, range=None):
+    s, xe, bn = ss.binned_statistic(x, y, statistic, bins=bins, range=range)
+    xt = .5 * (xe[1:] + xe[:-1])
+    plt.plot(xt, s)
+
+    
+def binned_statistic_plot_2d(x, y, z, statistic='mean', bins=None, range=None):
     s, xe, ye, bn = ss.binned_statistic_2d(x, y, z, statistic)
     plt.imshow(s.T[::-1], cmap='Greens')
     xt = .5 * (xe[1:] + xe[:-1])
     yt = .5 * (ye[1:] + ye[:-1])[::-1]
     plt.xticks(np.arange(len(xt)), np.round(xt, 1))
     plt.yticks(np.arange(len(yt)), np.round(yt, 1))
-    
-    

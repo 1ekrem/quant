@@ -27,28 +27,32 @@ def get_clean_returns(rtns):
     return r
 
 
-def get_signal_1(rtns, vol):
+def get_rev_signal_v2(rtns, vol, i=3, low=1., high=.5):
     '''
-    Reversal
+    2nd Gen reversal signal
     '''
     r = rtns.divide(vol)
     rm = r.subtract(r.mean(axis=1), axis=0)
-    s1 = rm.rolling(3).mean()
-    s2 = rm.rolling(52, min_periods=13).mean().shift(3)
-    sig = 1. * ((s1 <= -.6) & (s2 >= .4))
+    s1 = rm.rolling(i).mean()
+    s2 = rm.rolling(52, min_periods=13).mean().shift(i)
+    acc = r.cumsum().ffill()
+    ax = acc.rolling(i, min_periods=1).min()
+    sig = 1. * ((s1 <= -low) & (s2 >= high) & (acc == ax))
     return sig[sig.abs() > 0]
+
+
+def get_signal_1(rtns, vol):
+    '''
+    Reversal 3 weeks
+    '''
+    return get_rev_signal_v2(rtns, vol, 3, .9, .3)
 
 
 def get_signal_2(rtns, vol):
     '''
-    Reversal
+    reversal 4 weeks
     '''
-    r = rtns.divide(vol)
-    rm = r.subtract(r.mean(axis=1), axis=0)
-    s1 = rm
-    s2 = rm.rolling(52, min_periods=13).mean().shift()
-    sig = 1. * ((s1 <= -2.) & (s2 >= .3))
-    return sig[sig.abs() > 0]
+    return get_rev_signal_v2(rtns, vol, 4, .3, .3)
 
 
 def get_pnl(sig, rtns, vol):
@@ -87,13 +91,10 @@ def run_new_smx(r, v, posvol, capital=500):
     rtn = rtn.subtract(rtn.mean(axis=1), axis=0)
     s1 = rtn.rolling(3).mean()
     s2 = rtn.rolling(52, min_periods=13).mean().shift(3)
-    s3 = rtn.rolling(2).mean()
-    s4 = rtn.rolling(52, min_periods=13).mean().shift(2)
-    s5 = rtn.rolling(6).mean()
-    s6 = rtn.rolling(52, min_periods=13).mean().shift(6)
-    sig = pd.concat([s1.iloc[-1], s2.iloc[-1], s3.iloc[-1], s4.iloc[-1], s5.iloc[-1], 
-                     s6.iloc[-1], capital / posvol.iloc[-1]], axis=1)
-    sig.columns = ['Low3', 'High3', 'Low2', 'High2', 'Low6', 'High6', 'Position']
+    s3 = rtn.rolling(4).mean()
+    s4 = rtn.rolling(52, min_periods=13).mean().shift(4)
+    sig = pd.concat([s1.iloc[-1], s2.iloc[-1], s3.iloc[-1], s4.iloc[-1], capital / posvol.iloc[-1]], axis=1)
+    sig.columns = ['Low3', 'High3', 'Low4', 'High4', 'Position']
     sig = sig.sort_values('High3', ascending=False)
     sig = sig.dropna()
     return sig, pos.iloc[-1] * capital, pos2.iloc[-1] * capital, sig_date, pnl, pnl2

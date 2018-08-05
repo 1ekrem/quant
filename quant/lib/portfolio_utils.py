@@ -116,6 +116,22 @@ def calc_drawdown(returns):
     return _calc_drawdown(returns) if isinstance(returns, pd.Series) else returns.apply(_calc_drawdown, axis=0)
 
 
+def _calc_drawdown_age(returns, max_age=13):
+    c = returns.cumsum().ffill().fillna(0.)
+    d = (c.rolling(max_age, min_periods=1).max() - c).fillna(0.)
+    x = 0
+    ans = []
+    for y in d.values:
+        tmp = 0 if y == 0 else x + 1
+        ans.append(tmp)
+        x = tmp
+    return pd.Series(ans, index=returns.index, name=returns.name)
+
+
+def calc_drawdown_age(returns, max_age=13):
+    return _calc_drawdown(returns, max_age) if isinstance(returns, pd.Series) else returns.apply(_calc_drawdown_age, axis=0, args=([max_age]))
+    
+    
 # Simulations
 class TradingSim(object):
     '''

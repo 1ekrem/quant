@@ -25,7 +25,7 @@ class MomentumSim(object):
     '''
     Stocks strategy
     '''
-    def __init__(self, start_date, end_date, sample_date, universe, simulation_name, max_depth=9, model_path=MODEL_PATH, 
+    def __init__(self, start_date, end_date, sample_date, universe, simulation_name, max_depth=6, model_path=MODEL_PATH, 
                  load_model=False, cross_validation_buskcets=10, top=3, holding_period=4, long_only=True):
         self.simulation_name = simulation_name
         self.start_date = start_date
@@ -92,8 +92,9 @@ class MomentumSim(object):
         ans = {}
        # for data_name, data in [('R', self.r), ('RS', self.rs)]:
         for data_name, data in [('RM', self.rm)]:
-            ans.update(dict([('%s%d' % (data_name, i), data.rolling(i).mean()) for i in lookbacks]))
-            ans.update(dict([('M%s%d' % (data_name, i), data.rolling(52, min_periods=13).mean().shift(i)) for i in lookbacks]))
+            ans.update(dict([('%s%d' % (data_name, i), data.rolling(52, min_periods=13).mean().shift(i) - data.rolling(i).mean()) for i in lookbacks]))
+            #ans.update(dict([('%s%d' % (data_name, i), data.rolling(i).mean()) for i in lookbacks]))
+            #ans.update(dict([('M%s%d' % (data_name, i), data.rolling(52, min_periods=13).mean().shift(i)) for i in lookbacks]))
         return ans
 
     def estimate_model(self, x, timeline, asset_returns=None, model=None):
