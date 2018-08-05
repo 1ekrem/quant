@@ -84,11 +84,17 @@ def run_new_smx(r, v, posvol, capital=500):
     pnl = get_clean_returns(r).mul(pos.shift()).sum(axis=1)
     pnl2 = get_clean_returns(r).mul(pos2.shift()).sum(axis=1)
     rtn = r.divide(v)
+    rtn = rtn.subtract(rtn.mean(axis=1), axis=0)
     s1 = rtn.rolling(3).mean()
     s2 = rtn.rolling(52, min_periods=13).mean().shift(3)
-    sig = pd.concat([s1.iloc[-1], s2.iloc[-1], capital / posvol.iloc[-1]], axis=1)
-    sig.columns = ['Reversal', 'M52', 'Position']
-    sig = sig.sort_values('M52', ascending=False)
+    s3 = rtn.rolling(2).mean()
+    s4 = rtn.rolling(52, min_periods=13).mean().shift(2)
+    s5 = rtn.rolling(6).mean()
+    s6 = rtn.rolling(52, min_periods=13).mean().shift(6)
+    sig = pd.concat([s1.iloc[-1], s2.iloc[-1], s3.iloc[-1], s4.iloc[-1], s5.iloc[-1], 
+                     s6.iloc[-1], capital / posvol.iloc[-1]], axis=1)
+    sig.columns = ['Low3', 'High3', 'Low2', 'High2', 'Low6', 'High6', 'Position']
+    sig = sig.sort_values('High3', ascending=False)
     sig = sig.dropna()
     return sig, pos.iloc[-1] * capital, pos2.iloc[-1] * capital, sig_date, pnl, pnl2
 

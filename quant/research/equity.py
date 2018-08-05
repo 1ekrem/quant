@@ -25,7 +25,7 @@ class MomentumSim(object):
     '''
     Stocks strategy
     '''
-    def __init__(self, start_date, end_date, sample_date, universe, simulation_name, max_depth=6, model_path=MODEL_PATH, 
+    def __init__(self, start_date, end_date, sample_date, universe, simulation_name, max_depth=9, model_path=MODEL_PATH, 
                  load_model=False, cross_validation_buskcets=10, top=3, holding_period=4, long_only=True):
         self.simulation_name = simulation_name
         self.start_date = start_date

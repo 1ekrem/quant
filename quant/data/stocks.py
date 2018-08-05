@@ -51,6 +51,38 @@ def import_ftse_smx_tickers():
 def import_ftse250_tickers():
     import_tickers('FTSE250', 'FTSE250')
 
+# Bloomberg prices
+def import_bloomberg_prices():
+    filename = os.path.expanduser('~/TempWork/scripts/bloomberg.xlsx')
+    data = pd.read_excel(filename)
+    n = len(data.columns)
+    i = 0
+    while i < n:
+        stock_name = data.columns[i+1]
+        logger.info('Storing %s' % stock_name)
+        tmp = data.iloc[:, i+1]
+        tmp.index = data.iloc[:, i]
+        tmp = tmp.dropna().to_frame()
+        tmp.columns = ['Close']
+        save_data(tmp, stock_name, UK_STOCKS, False)
+        i += 2
+
+
+def export_smx_bloomberg_file():
+    filename = os.path.expanduser('~/TempWork/scripts/bloomberg.xlsx')
+    u = get_ftse_smx_universe()
+    u2 = get_ftse250_universe()
+    u = pd.concat([u, u2.loc[~u2.index.isin(u.index)]], axis=0)
+    ans = []
+    today = dt.today().strftime('%m/%d/%Y')
+    for i, x in enumerate(u.index):
+        s = '''=BDH("%s Equity", "PX_LAST", "1/1/2017", "%s")''' % (x, today)
+        ans.append(pd.DataFrame([[s, '']], columns=[i+1, x], index=[0]))
+    ans = pd.concat(ans, axis=1)
+    ff = pd.ExcelWriter(filename)
+    ans.to_excel(ff, 'BBG')
+    ff.save()
+
 
 # Google prices
 def load_google_prices(ticker, exchange='LON', period='1Y'):
@@ -62,11 +94,12 @@ def load_google_prices(ticker, exchange='LON', period='1Y'):
         return pd.DataFrame([])
 
 
-def save_data(data, ticker, data_table, load_volume):
+def save_data(data, ticker, data_table, load_volume=True, clean_data=True):
     data = data.resample('B').last()
     data = data.loc[data.Close > 1e-2]
     r = np.log(data.Close).diff().dropna()
-    r = tu.remove_outliers(r)
+    if clean_data:
+        r = tu.remove_outliers(r)
     r.name = ticker
     tu.store_timeseries(r, DATABASE_NAME, data_table, 'Returns')
     if load_volume:
@@ -75,13 +108,13 @@ def save_data(data, ticker, data_table, load_volume):
         tu.store_timeseries(v, DATABASE_NAME, data_table, 'Volume')
 
 
-def import_google_prices(ticker, exchange='LON', period='1Y', data_table=UK_STOCKS, load_volume=True):
+def import_google_prices(ticker, exchange='LON', period='1Y', data_table=UK_STOCKS, load_volume=True, clean_data=True):
     logger.info('Loading %s' % ticker)
     data = load_google_prices(ticker, exchange, period)
     if data.empty:
         logger.info('Data not found')
     else:
-        save_data(data, ticker, data_table, load_volume)
+        save_data(data, ticker, data_table, load_volume, clean_data)
 
 
 def import_saved_stock_prices():
@@ -93,26 +126,20 @@ def import_saved_stock_prices():
         data = ff.parse(stock)
         data.index = data.Date
         data['Close'] = data['Adj Close']
-        save_data(data, stock, UK_STOCKS, True)
+        save_data(data, stock, UK_STOCKS, True, True)
         
 
-def import_ftse250_index_prices(period='1M'):
-    import_google_prices('MCX', 'INDEXFTSE', period, GLOBAL_ASSETS, load_volume=False)
+def import_ftse250_index_prices(period='1Y'):
+    import_google_prices('MCX', 'INDEXFTSE', period, GLOBAL_ASSETS, load_volume=False, clean_data=False)
 
 
 def import_exchange_rates(period='1M'):
-    import_google_prices('GBPUSD', 'CURRENCY', period, GLOBAL_ASSETS, load_volume=False)
-    import_google_prices('EURUSD', 'CURRENCY', period, GLOBAL_ASSETS, load_volume=False)
-    import_google_prices('EURGBP', 'CURRENCY', period, GLOBAL_ASSETS, load_volume=False)
+    import_google_prices('GBPUSD', 'CURRENCY', period, GLOBAL_ASSETS, load_volume=False, clean_data=False)
+    import_google_prices('EURUSD', 'CURRENCY', period, GLOBAL_ASSETS, load_volume=False, clean_data=False)
+    import_google_prices('EURGBP', 'CURRENCY', period, GLOBAL_ASSETS, load_volume=False, clean_data=False)
 
 
-def import_smx_google_prices(period='1M'):
-    u = get_ftse_smx_universe()
-    for idx in u.index:
-        import_google_prices(idx, 'LON', period, UK_STOCKS)
-
-
-def import_uk_google_prices(period='1M'):
+def import_uk_google_prices(period='1Y'):
     u = get_ftse_smx_universe()
     u2 = get_ftse250_universe()
     u = pd.concat([u, u2.loc[~u2.index.isin(u.index)]], axis=0)
