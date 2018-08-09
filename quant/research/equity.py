@@ -92,9 +92,8 @@ class MomentumSim(object):
         ans = {}
        # for data_name, data in [('R', self.r), ('RS', self.rs)]:
         for data_name, data in [('RM', self.rm)]:
-            ans.update(dict([('%s%d' % (data_name, i), data.rolling(52, min_periods=13).mean().shift(i) - data.rolling(i).mean()) for i in lookbacks]))
-            #ans.update(dict([('%s%d' % (data_name, i), data.rolling(i).mean()) for i in lookbacks]))
-            #ans.update(dict([('M%s%d' % (data_name, i), data.rolling(52, min_periods=13).mean().shift(i)) for i in lookbacks]))
+            ans.update(dict([('%s%d' % (data_name, i), data.rolling(i).mean()) for i in lookbacks]))
+            ans.update(dict([('M%s%d' % (data_name, i), data.rolling(52, min_periods=13).mean().shift(i)) for i in lookbacks]))
         return ans
 
     def estimate_model(self, x, timeline, asset_returns=None, model=None):

@@ -121,14 +121,14 @@ def estimate_reversal(universe='SMX'):
     u = stocks.get_universe(universe)
     r = r.loc[:, r.columns.isin(u.index)]
     w = r.abs()
-    vol = w[w > 0].rolling(52, min_periods=13).median().ffill().bfill()
+    vol = w[w > 0].rolling(52, min_periods=13).median()
+    vol[vol < 5e-3] = 5e-3
     vol2 = vol.copy()
     vol2[vol2 < .02] = .02
-    vol3 = w[w > 0].rolling(13, min_periods=4).median().ffill().bfill()
     #a = pu.calc_drawdown_age(r)
     for i in xrange(1, 10):
         logger.info('Lookback %d' % i)
-        pnl = run_long3(r, vol, vol2, i)
+        pnl = run_long2(r, vol, vol2, i)
         if pnl is not None:
             pnl.plot()
     plt.legend(loc='best', frameon=False)
