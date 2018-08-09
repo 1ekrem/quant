@@ -4,6 +4,7 @@ Created on 18 Sep 2017
 @author: wayne
 '''
 import os
+import time
 import numpy as np
 import pandas as pd
 import googlefinance.client as gc
@@ -210,8 +211,13 @@ def import_uk_yahoo_prices(days=30):
     start_date = end_date - timedelta(days)
     u = get_ftse_smx_universe()
     u2 = get_ftse250_universe()
-    u = pd.concat([u, u2.loc[~u2.index.isin(u.index)]], axis=0)
+    u = pd.concat([u, u2.loc[~u2.index.isin(u.index)]], axis=0, sort=False)
+    i = 0
     for idx in u.index:
+        i += 1
+        if i % 25 == 0:
+            logger.info('Waiting...')
+            time.sleep(60 * 5)
         import_yahoo_prices(idx + '.L', idx, start_date, end_date, data_table=UK_STOCKS,
                             load_volume=True, clean_data=True)
 
