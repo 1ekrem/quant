@@ -11,7 +11,8 @@ import googlefinance.client as gc
 from quant.lib import data_utils as du, timeseries_utils as tu, portfolio_utils as pu
 from quant.lib.main_utils import logger
 from quant.data import quandldata
-from datetime import datetime as dt, timedelta
+from datetime import datetime as dt
+from dateutil.relativedelta import relativedelta
 import fix_yahoo_finance as yf
 
 
@@ -107,10 +108,21 @@ def export_global_bloomberg_file():
 
 
 # Google prices
+def _divide_hundred(x):
+    ans = x.copy()
+    ans[ans == 0.] = np.nan
+    for i in xrange(len(x)-1):
+        if ans.iloc[i+1] / ans.iloc[i] > 70:
+            ans.iloc[i+1] /= 100.
+        elif ans.iloc[i+1] / ans.iloc[i] > 7:
+            ans.iloc[i+1] /= 10.
+    return ans
+ 
+
 def load_yahoo_prices(ticker, start_date=dt(2018,7,1), end_date=dt.today()):
     try:
         data = yf.download(ticker, start=start_date, end=end_date)
-        data.loc[:, 'Close'] = data.loc[:, 'Adj Close']
+        data.loc[:, 'Close'] = _divide_hundred(data.loc[:, 'Adj Close'])
         return data
     except Exception as e:
         logger.warn('Failed: %s' % str(e))
@@ -177,7 +189,7 @@ def import_ftse250_index_prices(period='1Y'):
 
 def import_ftse250_index_prices_from_yahoo(days=30):
     end_date = dt.today()
-    start_date = end_date - timedelta(days)
+    start_date = end_date - relativedelta(days=days)
     import_yahoo_prices('^FTMC', 'MCX', start_date, end_date, data_table=GLOBAL_ASSETS, load_volume=False, clean_data=False)
 
 
@@ -189,7 +201,7 @@ def import_exchange_rates(period='1M'):
 
 def import_exchange_rates_from_yahoo(days=30):
     end_date = dt.today()
-    start_date = end_date - timedelta(days)
+    start_date = end_date - relativedelta(days=days)
     import_yahoo_prices('GBPUSD=X', 'GBPUSD', start_date, end_date, data_table=GLOBAL_ASSETS,
                         load_volume=False, clean_data=False)
     import_yahoo_prices('EURUSD=X', 'EURUSD', start_date, end_date, data_table=GLOBAL_ASSETS,
@@ -206,18 +218,22 @@ def import_uk_google_prices(period='1Y'):
         import_google_prices(idx, 'LON', period, UK_STOCKS)
 
 
-def import_uk_yahoo_prices(days=30):
+def import_uk_yahoo_prices(years=1, missing=False):
     end_date = dt.today()
-    start_date = end_date - timedelta(days)
+    start_date = end_date - relativedelta(years=years)
     u = get_ftse_smx_universe()
     u2 = get_ftse250_universe()
     u = pd.concat([u, u2.loc[~u2.index.isin(u.index)]], axis=0, sort=False)
+    if missing:
+        r = load_google_returns(dt.today() - relativedelta(days=5), dt.today(), data_table=UK_STOCKS)
+        r = r.iloc[-1].loc[u.index]
+        u = u.loc[r.isnull()]
     i = 0
     for idx in u.index:
         i += 1
-        if i % 25 == 0:
+        if i % 30 == 0:
             logger.info('Waiting...')
-            time.sleep(60 * 5)
+            time.sleep(60 * 10)
         import_yahoo_prices(idx + '.L', idx, start_date, end_date, data_table=UK_STOCKS,
                             load_volume=True, clean_data=True)
 
