@@ -38,13 +38,17 @@ def read_tickers_file(filename):
         return None
 
 
-def import_tickers(filename, universe):
-    data = read_tickers_file(filename)
+def _save_tickers(data, universe):
     if data is not None:
         du.pandas_delete(DATABASE_NAME, STOCKS_DESCRIPTION, du.DESCRIPTION_COLUMN_NAME, du.DESCRIPTION_INDEX_NAME,
                          du.DESCRIPTION_VALUE_NAME, data_name=universe)
         data.name = universe
         tu.store_description(data, DATABASE_NAME, STOCKS_DESCRIPTION)
+
+
+def import_tickers(filename, universe):
+    data = read_tickers_file(filename)
+    _save_tickers(data, universe)
 
 
 def import_ftse_smx_tickers():
@@ -231,9 +235,9 @@ def import_uk_yahoo_prices(years=1, missing=False):
     i = 0
     for idx in u.index:
         i += 1
-        if i % 30 == 0:
+        if i % 40 == 0:
             logger.info('Waiting...')
-            time.sleep(60 * 10)
+            time.sleep(60 * 15)
         import_yahoo_prices(idx + '.L', idx, start_date, end_date, data_table=UK_STOCKS,
                             load_volume=True, clean_data=True)
 

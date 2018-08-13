@@ -27,6 +27,15 @@ def resample(ts, timeline, carry_forward=True):
     return ts.loc[timeline.index]
 
 
+def fit_data(x, y):
+    return resample(x, y).loc[:, y.columns]
+
+
+def get_observations(x, y):
+    ans = fit_data(x, y).values.flatten()
+    return ans[y.values.flatten() > 0]
+
+
 def remove_outliers(data, z=15):
     x = data / data.std()
     ans = data.copy()

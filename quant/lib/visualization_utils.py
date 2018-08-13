@@ -138,8 +138,9 @@ def highlight_last_observation(data, color='green'):
 
 def binned_statistic_plot(x, y, statistic='mean', bins=None, range=None):
     s, xe, bn = ss.binned_statistic(x, y, statistic, bins=bins, range=range)
-    xt = .5 * (xe[1:] + xe[:-1])
-    plt.plot(xt, s)
+    data = pd.Series(s, index = .5 * (xe[1:] + xe[:-1])).fillna(0.)
+    data.index = ['%.2f' % x for x in data.index]
+    bar_plot(data)
 
     
 def binned_statistic_plot_2d(x, y, z, statistic='mean', bins=None, range=None):
