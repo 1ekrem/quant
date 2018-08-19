@@ -235,9 +235,9 @@ def import_uk_yahoo_prices(years=1, missing=False):
     i = 0
     for idx in u.index:
         i += 1
-        if i % 40 == 0:
+        if i % 30 == 0:
             logger.info('Waiting...')
-            time.sleep(60 * 20)
+            time.sleep(60 * 15)
         import_yahoo_prices(idx + '.L', idx, start_date, end_date, data_table=UK_STOCKS,
                             load_volume=True, clean_data=True)
 

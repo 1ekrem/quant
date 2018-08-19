@@ -51,14 +51,16 @@ def run_smx_check():
     table3.index = table3.index.strftime('%Y-%m-%d')
     table = m._pos.iloc[-1].dropna().sort_values().to_frame()
     table.index.name = 'Signal'
-    table2 = np.round(CAPITAL * m.positions.iloc[-1].dropna().sort_values().to_frame(), 0)
-    table.index.name = 'Positions'
+    table2 = CAPITAL * pd.concat([m.positions.iloc[-1], m.stock_pnl.resample('W').sum().iloc[-1]], axis=1)
+    table2.columns = ['Position', 'PnL']
+    table2 = np.round(table2.loc[~table2.Position.isnull()], 0)
+    table2.index.name = 'Ticker'
     mail.add_text('PnL')
     mail.add_table(table3, width=600)
     mail.add_text('Signal Positions')
     mail.add_table(table, width=400)
     mail.add_text('Current Positions')
-    mail.add_table(table2, width=400)
+    mail.add_table(table2, width=500)
     mail.add_attachment(fname)
     mail.send_email()
     os.remove(filename)

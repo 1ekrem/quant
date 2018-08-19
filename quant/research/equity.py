@@ -133,7 +133,8 @@ class MomentumSim(object):
             logger.info('Simulating portfolio')
             self._pos = calculate_signal_positions(self.signals[~self._r.isnull()], self.top, self.long_only)
             self.positions = tu.resample(self._pos.ffill(limit=self.holding_period).divide(self.stock_vol), self.stock_returns)
-            self.pnl = self.stock_returns.mul(self.positions).sum(axis=1)[self.start_date:]
+            self.stock_pnl = self.stock_returns.mul(self.positions)[self.start_date:]
+            self.pnl = self.stock_pnl.sum(axis=1)
             self.pnl.name = 'PnL'
             self.alpha = self.stock_alpha.mul(self.positions, level=1, axis=1).groupby(axis=1, level=0).sum()[self.start_date:]
             tmp = pd.concat([self.pnl, self.alpha], axis=1)

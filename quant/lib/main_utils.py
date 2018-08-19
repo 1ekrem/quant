@@ -34,6 +34,10 @@ EMPTY_EMAIL = '''
 </html>
 '''
 
+def make_dir(path):
+    if not os.path.exists(path):
+        os.makedirs(path)
+
 
 def load_pickle(filename):
     ans = None
