@@ -9,12 +9,6 @@ PATH = os.path.expanduser('~/TempWork/cross/')
 make_dir(PATH)
 
 
-def get_clean_returns(rtns):
-    r = rtns.copy()
-    r[r.abs() > .7] = np.nan
-    return r
-
-
 def _get_first(x):
     idx = x.index[x.abs() > 0]
     if len(idx) > 0:
@@ -26,6 +20,7 @@ def _get_first(x):
 
 
 def get_returns(r):
+    rc = r[r.abs() < .3]
     rtn = r.resample('W').sum().apply(_get_first, axis=0)
     w = rtn.abs()
     vol = w[w > 0].rolling(52, min_periods=13).median()
@@ -35,7 +30,7 @@ def get_returns(r):
     rv = rtn.divide(vol)
     rm = rv.subtract(rv.mean(axis=1), axis=0)
     s = r.abs().resample('W').max()
-    return rtn, rv, rm, vol2, s
+    return rtn, rm, vol2, s
 
 
 def get_pos(s1, s2, vol, high, low, acc, ax, s, bottom=True, shock=False):
@@ -44,7 +39,7 @@ def get_pos(s1, s2, vol, high, low, acc, ax, s, bottom=True, shock=False):
     else:
         pos = 1. * ((s1 <= -low) & (s2 >= high))
     if shock:
-        pos = pos[s < .2]
+        pos = pos[s <= .25]
     return pos.divide(vol)
 
 
@@ -64,13 +59,13 @@ def get_pnl(s1, s2, r, vol, high, low, acc, ax, s, bottom=True, shock=False):
 # Lookback, timing bottom
 def run_long(rtn, rm, vol, sx, i, start_date, end_date, style='A', bottom=True, shock=False):
     if style == 'A':
-        l = np.arange(.3, 1.51, .1)
+        l = np.arange(.3, 2.01, .1)
         s1 = rm.rolling(i).mean().loc[rtn.index]
         s2 = rm.rolling(52, min_periods=13).mean().shift(i).loc[rtn.index]
     elif style == 'B':
-        l = np.arange(.5, 2.01, .1)
-        s1 = rm.rolling(i, min_periods=1).sum().loc[rtn.index] / np.sqrt(1. * i)
-        s2 = rm.rolling(52, min_periods=13).sum().shift(i).loc[rtn.index]  / np.sqrt(52.)
+        l = np.arange(.5, 3.01, .1)
+        s1 = rm.rolling(i, min_periods=1).mean().loc[rtn.index] * np.sqrt(1. * i)
+        s2 = rm.rolling(52, min_periods=13).mean().shift(i).loc[rtn.index] * np.sqrt(52.)
     s = sx.rolling(13, min_periods=1).max()
     acc = rtn.cumsum()
     ax = acc.rolling(i, min_periods=1).min()
@@ -96,13 +91,13 @@ def run_long(rtn, rm, vol, sx, i, start_date, end_date, style='A', bottom=True, 
 
 def run_long_pos(r, rm, vol, i, start_date, end_date, style='A', bottom=True):
     if style == 'A':
-        l = np.arange(.3, 1.51, .1)
+        l = np.arange(.3, 2.01, .1)
         s1 = rm.rolling(i).mean().loc[r.index]
         s2 = rm.rolling(52, min_periods=13).mean().shift(i).loc[r.index]
     elif style == 'B':
-        l = np.arange(.5, 2.01, .1)
-        s1 = rm.rolling(i, min_periods=1).sum().loc[r.index] / np.sqrt(1. * i)
-        s2 = rm.rolling(52, min_periods=13).sum().shift(i).loc[r.index]  / np.sqrt(52.)    
+        l = np.arange(.5, 2.51, .1)
+        s1 = rm.rolling(i, min_periods=1).mean().loc[r.index] * np.sqrt(1. * i)
+        s2 = rm.rolling(52, min_periods=13).mean().shift(i).loc[r.index] * np.sqrt(52.)    
     acc = r.cumsum()
     ax = acc.rolling(i, min_periods=1).min()
     ans = None
@@ -122,7 +117,7 @@ def estimate_reversal(universe='SMX', start_date=dt(2009, 1, 1), end_date=dt(201
     r = stocks.load_google_returns(data_table=stocks.UK_STOCKS)
     u = stocks.get_universe(universe)
     r = r.loc[:, r.columns.isin(u.index)]
-    rtn, rv, rm, vol, sx = get_returns(r)
+    rtn, rm, vol, sx = get_returns(r)
     ana = []
     plt.figure(figsize=(10, 7))
     for i in xrange(1, 14):
@@ -151,7 +146,8 @@ def run_all():
     for universe in ['SMX', 'FTSE250']:
         for style in ['A', 'B']:
             for bottom in [True, False]:
-                estimate_reversal(universe, style=style, bottom=bottom, shock=True)
+                for shock in [True, False]:
+                    estimate_reversal(universe, style=style, bottom=bottom, shock=shock)
 
 
 def test_reversal(universe='SMX', start_date=dt(2009, 1, 1), end_date=dt(2015, 12, 31), style='A', bottom=True):

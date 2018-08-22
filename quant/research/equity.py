@@ -5,6 +5,7 @@ from quant.lib import timeseries_utils as tu, portfolio_utils as pu, \
 from matplotlib import pyplot as plt
 
 STOCK_VOL_FLOOR = 0.02
+MAX_SHOCK = .2
 
 
 def calculate_signal_positions(signal, top=5, long_only=True):
@@ -26,7 +27,8 @@ class MomentumSim(object):
     Stocks strategy
     '''
     def __init__(self, start_date, end_date, sample_date, universe, simulation_name, max_depth=6, model_path=MODEL_PATH, 
-                 load_model=False, cross_validation_buskcets=10, top=3, holding_period=4, long_only=True):
+                 load_model=False, cross_validation_buskcets=10, top=3, holding_period=4, long_only=True,
+                 max_shock=MAX_SHOCK):
         self.simulation_name = simulation_name
         self.start_date = start_date
         self.end_date = end_date
@@ -40,6 +42,7 @@ class MomentumSim(object):
         self.top = top
         self.long_only = long_only
         self.holding_period = holding_period
+        self.max_shock = max_shock
         self.run_sim()
     
     def run_sim(self):

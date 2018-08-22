@@ -20,6 +20,8 @@ DATABASE_NAME = 'quant'
 STOCKS_DESCRIPTION = 'stocks_description'
 GLOBAL_ASSETS = 'global_assets'
 UK_STOCKS = 'uk_stocks'
+SMX_EXCLUDED = ['BGS']
+FTSE250_EXCLUDED = []
 
 
 def create_google_table():
@@ -248,11 +250,13 @@ def get_universe(universe):
 
 
 def get_ftse_smx_universe():
-    return tu.get_description(DATABASE_NAME, STOCKS_DESCRIPTION, ['SMX'])
+    ans = get_universe('SMX')
+    return ans.loc[~ans.index.isin(SMX_EXCLUDED)]
 
 
 def get_ftse250_universe():
-    return tu.get_description(DATABASE_NAME, STOCKS_DESCRIPTION, ['FTSE250'])
+    ans = get_universe('FTSE250')
+    return ans.loc[~ans.index.isin(FTSE250_EXCLUDED)]
 
 
 def load_google_returns(start_date=None, end_date=None, data_name='Returns', data_table=GLOBAL_ASSETS):
