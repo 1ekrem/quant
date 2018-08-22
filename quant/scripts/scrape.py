@@ -1,10 +1,17 @@
 from quant.lib.main_utils import *
 import urllib2
+import requests
 from bs4 import BeautifulSoup
+
+HEADERS = requests.utils.default_headers()
+HEADERS.update({
+    'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:52.0) Gecko/20100101 Firefox/52.0',
+})
 
 
 def get_page(url):
-    page = urllib2.urlopen(url).read()
+    #page = urllib2.urlopen(url).read()
+    page = requests.get(url, headers=HEADERS).content
     soup = BeautifulSoup(page)
     return soup
 
@@ -55,7 +62,8 @@ def get_hl_stocks_table(url):
         ans = pd.concat(ans, axis=0)
         ans.index = ans.Ticker.str.replace('.', '')
         for kw in ['Fund', 'Trust', 'REIT', 'Invest', 'Fidelity', 'Aberdeen', 'BH ', 'Henderson',
-                   'JPMorgan', 'Alpha']:
+                   'JPMorgan', 'Alpha', 'Inv Tst', 'Baillie Gifford', 'Credit', 'Real Estate', 'Equity',
+                   'GBP', 'Capital']:
             ans = ans.loc[~ans.Name.str.contains(kw)]
         return ans.Name
     else:
