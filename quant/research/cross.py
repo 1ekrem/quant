@@ -33,18 +33,23 @@ def get_returns(r):
     return rtn, rm, vol2, s
 
 
-def get_pos(s1, s2, vol, high, low, acc, ax, s, bottom=True, shock=False):
+def get_pos(s1, s2, vol, high, low, acc, ax, s, bottom=True, shock=False, period=True):
     if bottom:
         pos = 1. * ((s1 <= -low) & (s2 >= high) & (acc == ax))
     else:
         pos = 1. * ((s1 <= -low) & (s2 >= high))
     if shock:
         pos = pos[s <= .25]
-    return pos.divide(vol)
+    pos = pos.divide(vol)
+    if period:
+        pos = pos.fillna(0.)
+        pos = pos[pos.rolling(2, min_periods=1).max().shift() == 0]
+        pos = pos[pos > 0]
+    return pos
 
 
-def get_pnl(s1, s2, r, vol, high, low, acc, ax, s, bottom=True, shock=False):
-    p = get_pos(s1, s2, vol, high, low, acc, ax, s, bottom, shock)
+def get_pnl(s1, s2, r, vol, high, low, acc, ax, s, bottom=True, shock=False, period=True):
+    p = get_pos(s1, s2, vol, high, low, acc, ax, s, bottom, shock, period=period)
     if p.abs().sum(axis=1).sum() > 0:
         p = p[p.abs() > 0].ffill(limit=3)
         g = p.abs().sum(axis=1)
@@ -57,10 +62,10 @@ def get_pnl(s1, s2, r, vol, high, low, acc, ax, s, bottom=True, shock=False):
 
 
 # Lookback, timing bottom
-def run_long(rtn, rm, vol, sx, i, start_date, end_date, style='A', bottom=True, shock=False):
+def run_long(rtn, rm, vol, sx, i, start_date, end_date, style='A', bottom=True, shock=False, period=True):
     if style == 'A':
         l = np.arange(.3, 2.01, .1)
-        s1 = rm.rolling(i).mean().loc[rtn.index]
+        s1 = rm.rolling(i, min_periods=1).mean().loc[rtn.index]
         s2 = rm.rolling(52, min_periods=13).mean().shift(i).loc[rtn.index]
     elif style == 'B':
         l = np.arange(.5, 3.01, .1)
@@ -75,7 +80,7 @@ def run_long(rtn, rm, vol, sx, i, start_date, end_date, style='A', bottom=True, 
     df = -1.
     for high in l:
         for low in l:
-            pnl = get_pnl(s1, s2, rtn, vol, high, low, acc, ax, s, bottom, shock)
+            pnl = get_pnl(s1, s2, rtn, vol, high, low, acc, ax, s, bottom, shock, period=period)
             if pnl is not None:
                 pnl = pnl[start_date:]
                 tot = pnl.mean()
@@ -89,27 +94,29 @@ def run_long(rtn, rm, vol, sx, i, start_date, end_date, style='A', bottom=True, 
     return ans, mu, df
  
 
-def run_long_pos(r, rm, vol, i, start_date, end_date, style='A', bottom=True):
+def run_long_pos(rtn, rm, vol, sx, i, start_date, end_date, style='A', bottom=True, shock=False):
     if style == 'A':
         l = np.arange(.3, 2.01, .1)
-        s1 = rm.rolling(i).mean().loc[r.index]
-        s2 = rm.rolling(52, min_periods=13).mean().shift(i).loc[r.index]
+        s1 = rm.rolling(i, min_periods=1).mean().loc[rtn.index]
+        s2 = rm.rolling(52, min_periods=13).mean().shift(i).loc[rtn.index]
     elif style == 'B':
-        l = np.arange(.5, 2.51, .1)
-        s1 = rm.rolling(i, min_periods=1).mean().loc[r.index] * np.sqrt(1. * i)
-        s2 = rm.rolling(52, min_periods=13).mean().shift(i).loc[r.index] * np.sqrt(52.)    
-    acc = r.cumsum()
+        l = np.arange(.5, 3.01, .1)
+        s1 = rm.rolling(i, min_periods=1).mean().loc[rtn.index] * np.sqrt(1. * i)
+        s2 = rm.rolling(52, min_periods=13).mean().shift(i).loc[rtn.index] * np.sqrt(52.)    
+    s = sx.rolling(13, min_periods=1).max()
+    acc = rtn.cumsum()
     ax = acc.rolling(i, min_periods=1).min()
     ans = None
     m = -1.
     for high in l:
         for low in l:
-            pnl = get_pnl(s1, s2, r, vol, high, low, acc, ax, bottom)
+            pnl = get_pnl(s1, s2, rtn, vol, high, low, acc, ax, s, bottom, shock)
             if pnl is not None:
-                tot = pnl[start_date:].mean()
+                pnl = pnl[start_date:]
+                tot = pnl.mean()
                 if tot > m:
                     m = tot
-                    ans = get_pos(s1, s2, vol, high, low, acc, ax, bottom)[start_date:]
+                    ans = get_pos(s1, s2, vol, high, low, acc, ax, s, bottom, shock, period=False)[start_date:]
     return ans
 
     
@@ -122,7 +129,7 @@ def estimate_reversal(universe='SMX', start_date=dt(2009, 1, 1), end_date=dt(201
     plt.figure(figsize=(10, 7))
     for i in xrange(1, 14):
         logger.info('Lookback %d' % i)
-        pnl, mu, df = run_long(rtn, rm, vol, sx, i, start_date, end_date, style, bottom, shock)
+        pnl, mu, df = run_long(rtn, rm, vol, sx, i, start_date, end_date, style, bottom, shock, period=True if i > 5 else False)
         if pnl is not None:
             pnl.plot()
             ana.append([mu, df])
@@ -150,22 +157,35 @@ def run_all():
                     estimate_reversal(universe, style=style, bottom=bottom, shock=shock)
 
 
-def test_reversal(universe='SMX', start_date=dt(2009, 1, 1), end_date=dt(2015, 12, 31), style='A', bottom=True):
+def _count_zero(x):
+    i = 0
+    ans = []
+    for v in x:
+        ans.append(i)
+        if v > 0:
+            i = 0
+        else:
+            i += 1
+    return ans
+
+
+def test_reversal(universe='SMX', start_date=dt(2009, 1, 1), end_date=dt(2015, 12, 31), style='A', bottom=True, shock=False):
     r = stocks.load_google_returns(data_table=stocks.UK_STOCKS)
     u = stocks.get_universe(universe)
     r = r.loc[:, r.columns.isin(u.index)]
-    rtn, rv, rm, vol, sx = get_returns(r)
+    rtn, rm, vol, sx = get_returns(r)
     fr = rtn.rolling(4, min_periods=1).sum().shift(-4)
-    s = sx.rolling(13, min_periods=1).max()
     plt.figure(figsize=(14, 7))
     for i in xrange(1, 13):
         plt.subplot(3, 4, i)
         logger.info('Lookback %d' % i)
-        pos = run_long_pos(rtn, rm, vol, i, start_date, end_date, style, bottom)
+        pos = run_long_pos(rtn, rm, vol, sx, i, start_date, end_date, style, bottom, shock)
         if pos is not None:
-            x = tu.get_observations(s.loc[pos.index].fillna(0.), pos)
-            y = tu.get_observations(pos.mul(tu.fit_data(fr, pos)).fillna(0.), pos)
-            vu.binned_statistic_plot(x, y, 'mean', 7, (0., .4))
+            p = pos.fillna(0.)
+            ans = [np.mean(tu.get_observations(pos.mul(tu.fit_data(fr, pos)).fillna(0.),
+                                               pos[p.rolling(j, min_periods=1).max().shift() == 0]))
+                   for j in xrange(1, 14)]
+            vu.bar_plot(pd.Series(ans, index=np.arange(13)+1) - 1.)
             plt.title(i)
     plt.tight_layout()
     plt.savefig(PATH + '%s_%s_%s_%d_test2.png' % (universe, style, 'Bt' if bottom else 'All', start_date.year))

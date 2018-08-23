@@ -84,13 +84,8 @@ class MomentumSim(object):
         self.r = self._r.divide(v)
         self.rs = self._rs.divide(v)
         self.rm = self.rs.subtract(self.rs.mean(axis=1), axis=0)
-        #vv = self.stock_volume.rolling(252, min_periods=63).std()
-        #self.vl = self.stock_volume.divide(vv[vv > 0].ffill().bfill())
-        #self.vs = self.vl.mul(np.sign(self.stock_returns))
         
     def create_estimation_data(self, depth):
-        #lookbacks = [13, 26, 52][:depth]
-        #lookbacks = [3, 6, 9][:depth]
         lookbacks = np.arange(depth) + 1
         ans = {}
        # for data_name, data in [('R', self.r), ('RS', self.rs)]:
