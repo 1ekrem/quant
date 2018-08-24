@@ -26,7 +26,7 @@ def get_b_signal(r, rm, s, i=3, low=1., high=.5):
     s2 = rm.rolling(52, min_periods=13).mean().shift(i) * np.sqrt(52.)
     acc = r.cumsum().ffill()
     ax = acc.rolling(i, min_periods=1).min()
-    sig = 1. * ((s1 <= -low) & (s2 >= high) & (acc == ax) & (s <= .25))
+    sig = 1. * ((s1 <= -low) & (s2 >= high) & (acc == ax) & (s > 0))
     sig = sig[sig > 0]
     return get_period_signal(sig) if i > 5 else sig
 
@@ -39,7 +39,7 @@ def get_rev_signal_v2(r, rm, s, i=3, low=1., high=.5):
     s2 = rm.rolling(52, min_periods=13).mean().shift(i)
     acc = r.cumsum().ffill()
     ax = acc.rolling(i, min_periods=1).min()
-    sig = 1. * ((s1 <= -low) & (s2 >= high) & (acc == ax) & (s <= .25))
+    sig = 1. * ((s1 <= -low) & (s2 >= high) & (acc == ax) & (s > 0))
     sig = sig[sig > 0]
     return get_period_signal(sig) if i > 5 else sig
 
