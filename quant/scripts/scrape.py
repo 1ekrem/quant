@@ -61,10 +61,12 @@ def get_hl_stocks_table(url):
     if len(ans) > 0:
         ans = pd.concat(ans, axis=0)
         ans.index = ans.Ticker.str.replace('.', '')
-        for kw in ['Fund', 'Trust', 'REIT', 'Invest', 'Fidelity', 'Aberdeen', 'BH ', 'Henderson',
-                   'JPMorgan', 'Alpha', 'Inv Tst', 'Baillie Gifford', 'Credit', 'Real Estate', 'Equity',
-                   'GBP', 'Capital']:
-            ans = ans.loc[~ans.Name.str.contains(kw)]
+        ans['u'] = ans.Name.str.upper()
+        for kw in ['FUND', 'TRUST', 'REIT', 'INVEST', 'INV TST', 'FIDELITY', 'ABERDEEN', 'BH ', 'HENDERSON',
+                   'JPMORGAN', 'ALPHA', 'BAILLIE GIFFORD', 'CREDIT', 'REAL ESTATE', 'EQUITY', 'GBP',
+                   'CAPITAL', 'INFRASTRUCTURE', 'SYNCONA', 'F&C', 'INTERNATIONAL PUBLIC PARTNERSHIPS',
+                   'PERSHING SQUARE']:
+            ans = ans.loc[~ans.u.str.contains(kw)]
         return ans.Name
     else:
         return None

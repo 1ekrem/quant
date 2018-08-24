@@ -193,7 +193,7 @@ def test_reversal(universe='SMX', start_date=dt(2009, 1, 1), end_date=dt(2015, 1
 
 
 def test_all():
-    for universe in ['SMX', 'FTSE250']:
+    for universe in ['FTSE250']:
         for style in ['A', 'B']:
             for bottom in [True, False]:
                 test_reversal(universe, style=style, bottom=bottom)

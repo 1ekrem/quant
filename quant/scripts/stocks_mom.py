@@ -113,20 +113,36 @@ def run_new_smx(r, rm, posvol, s, capital=500):
 
 def run_ftse250(r, rm, posvol, s, capital=500):
     pos1 = get_rev_signal_v2(r, rm, s, 4, .4, .7)
-    pos2 = get_b_signal(r, rm, s, 4, 2.9, 1.4)
+    pos2 = get_rev_signal_v2(r, rm, s, 6, .4, .3)
+    pos3 = get_b_signal(r, rm, s, 4, 2.9, 1.4)
+    pos4 = get_b_signal(r, rm, s, 6, 2.5, .6)
     sig_date = pos1.index[-1]
     pos1 = (1. / posvol)[pos1 > 0].ffill(limit=3)
     pos2 = (1. / posvol)[pos2 > 0].ffill(limit=3)
+    pos3 = (1. / posvol)[pos3 > 0].ffill(limit=3)
+    pos4 = (1. / posvol)[pos4 > 0].ffill(limit=3)
     pnl = r.mul(pos1.shift())
     pnl2 = r.mul(pos2.shift())
+    pnl3 = r.mul(pos3.shift())
+    pnl4 = r.mul(pos4.shift())
     p1 = pd.concat([pos1.iloc[-1], pnl.iloc[-1]], axis=1) * capital
     p1.columns = ['Position', 'PnL']
     p1 = p1.loc[~p1.Position.isnull()]
     p2 = pd.concat([pos2.iloc[-1], pnl2.iloc[-1]], axis=1) * capital
     p2.columns = ['Position', 'PnL']
     p2 = p2.loc[~p2.Position.isnull()]
+    p3 = pd.concat([pos3.iloc[-1], pnl3.iloc[-1]], axis=1) * capital
+    p3.columns = ['Position', 'PnL']
+    p3 = p3.loc[~p3.Position.isnull()]
+    p4 = pd.concat([pos4.iloc[-1], pnl4.iloc[-1]], axis=1) * capital
+    p4.columns = ['Position', 'PnL']
+    p4 = p4.loc[~p4.Position.isnull()]
     pnl = pnl.sum(axis=1)
     pnl.name = 'A4'
     pnl2 = pnl2.sum(axis=1)
-    pnl2.name = 'B4'
-    return p1, p2, sig_date, pnl, pnl2
+    pnl2.name = 'A6'
+    pnl3 = pnl3.sum(axis=1)
+    pnl3.name = 'B4'
+    pnl4 = pnl4.sum(axis=1)
+    pnl4.name = 'B6'
+    return p1, p2, p3, p4, sig_date, pnl, pnl2, pnl3, pnl4

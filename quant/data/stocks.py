@@ -21,7 +21,7 @@ STOCKS_DESCRIPTION = 'stocks_description'
 GLOBAL_ASSETS = 'global_assets'
 UK_STOCKS = 'uk_stocks'
 SMX_EXCLUDED = ['BGS']
-FTSE250_EXCLUDED = []
+FTSE250_EXCLUDED = ['PIN', 'UKCM']
 
 
 def create_google_table():
