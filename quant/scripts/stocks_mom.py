@@ -18,28 +18,32 @@ def get_period_signal(sig):
     return sig[s.rolling(3).max().shift() == 0.]
 
 
-def get_b_signal(r, rm, s, i=3, low=1., high=.5):
+def get_b_signal(r, rm, s, i=3, low=1., high=.5, bottom=True):
     '''
     Type B reversal signal
     '''
     s1 = rm.rolling(i, min_periods=1).mean() * np.sqrt(1. * i)
     s2 = rm.rolling(52, min_periods=13).mean().shift(i) * np.sqrt(52.)
-    acc = r.cumsum().ffill()
-    ax = acc.rolling(i, min_periods=1).min()
-    sig = 1. * ((s1 <= -low) & (s2 >= high) & (acc == ax) & (s > 0))
+    sig = 1. * ((s1 <= -low) & (s2 >= high) & (s > 0))
+    if bottom:
+        acc = r.cumsum().ffill()
+        ax = acc.rolling(i, min_periods=1).min()
+        sig = sig[acc == ax]
     sig = sig[sig > 0]
     return get_period_signal(sig) if i > 5 else sig
 
 
-def get_rev_signal_v2(r, rm, s, i=3, low=1., high=.5):
+def get_a_signal(r, rm, s, i=3, low=1., high=.5, bottom=True):
     '''
     2nd Gen reversal signal
     '''
     s1 = rm.rolling(i, min_periods=1).mean()
     s2 = rm.rolling(52, min_periods=13).mean().shift(i)
-    acc = r.cumsum().ffill()
-    ax = acc.rolling(i, min_periods=1).min()
-    sig = 1. * ((s1 <= -low) & (s2 >= high) & (acc == ax) & (s > 0))
+    sig = 1. * ((s1 <= -low) & (s2 >= high) & (s > 0))
+    if bottom:
+        acc = r.cumsum().ffill()
+        ax = acc.rolling(i, min_periods=1).min()
+        sig = sig[acc == ax]
     sig = sig[sig > 0]
     return get_period_signal(sig) if i > 5 else sig
 
@@ -59,12 +63,12 @@ def get_ftse250_data():
 
 
 def run_new_smx(r, rm, posvol, s, capital=500):
-    pos1 = get_rev_signal_v2(r, rm, s, 2, .3, 1.5)
-    pos2 = get_rev_signal_v2(r, rm, s, 6, .3, .3)
-    pos3 = get_rev_signal_v2(r, rm, s, 7, .3, .4)
+    pos1 = get_a_signal(r, rm, s, 2, .3, 1.5)
+    pos2 = get_a_signal(r, rm, s, 6, .3, .3)
+    pos3 = get_a_signal(r, rm, s, 7, .3, .5)
     pos4 = get_b_signal(r, rm, s, 2, 1.7, 2.2)
-    pos5 = get_b_signal(r, rm, s, 6, 1.6, 1.8)
-    pos6 = get_b_signal(r, rm, s, 7, 1.4, 2.2)
+    pos5 = get_b_signal(r, rm, s, 3, 1.6, 2.1)
+    pos6 = get_b_signal(r, rm, s, 7, 1.4, 2.1)
     sig_date = pos1.index[-1]
     pos1 = (1. / posvol)[pos1 > 0].ffill(limit=3)
     pos2 = (1. / posvol)[pos2 > 0].ffill(limit=3)
@@ -105,17 +109,17 @@ def run_new_smx(r, rm, posvol, s, capital=500):
     pnl4 = pnl4.sum(axis=1)
     pnl4.name = 'B2'
     pnl5 = pnl5.sum(axis=1)
-    pnl5.name = 'B6'
+    pnl5.name = 'B3'
     pnl6 = pnl6.sum(axis=1)
     pnl6.name = 'B7'
     return p1, p2, p3, p4, p5, p6, sig_date, pnl, pnl2, pnl3, pnl4, pnl5, pnl6
 
 
 def run_ftse250(r, rm, posvol, s, capital=500):
-    pos1 = get_rev_signal_v2(r, rm, s, 4, .4, .7)
-    pos2 = get_rev_signal_v2(r, rm, s, 6, .4, .3)
-    pos3 = get_b_signal(r, rm, s, 4, 2.9, 1.4)
-    pos4 = get_b_signal(r, rm, s, 6, 2.5, .6)
+    pos1 = get_a_signal(r, rm, s, 4, .4, .8, bottom=False)
+    pos2 = get_a_signal(r, rm, s, 6, .3, .4, bottom=False)
+    pos3 = get_b_signal(r, rm, s, 4, 2.9, 1.7, bottom=False)
+    pos4 = get_b_signal(r, rm, s, 6, 2.8, 1.5, bottom=False)
     sig_date = pos1.index[-1]
     pos1 = (1. / posvol)[pos1 > 0].ffill(limit=3)
     pos2 = (1. / posvol)[pos2 > 0].ffill(limit=3)
