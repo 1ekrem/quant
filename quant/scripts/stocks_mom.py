@@ -18,13 +18,13 @@ def get_period_signal(sig):
     return sig[s.rolling(3).max().shift() == 0.]
 
 
-def get_b_signal(r, rm, s, i=3, low=1., high=.5, bottom=True):
+def get_b_signal(r, rm, s, x, x2, i=3, low=1., high=.5, bottom=True):
     '''
     Type B reversal signal
     '''
     s1 = rm.rolling(i, min_periods=1).mean() * np.sqrt(1. * i)
     s2 = rm.rolling(52, min_periods=13).mean().shift(i) * np.sqrt(52.)
-    sig = 1. * ((s1 <= -low) & (s2 >= high) & (s > 0))
+    sig = 1. * ((s1 <= -low) & (s2 >= high) & (s > 0) & (x > 0) & (x2 > 0))
     if bottom:
         acc = r.cumsum().ffill()
         ax = acc.rolling(i, min_periods=1).min()
@@ -33,13 +33,13 @@ def get_b_signal(r, rm, s, i=3, low=1., high=.5, bottom=True):
     return get_period_signal(sig) if i > 5 else sig
 
 
-def get_a_signal(r, rm, s, i=3, low=1., high=.5, bottom=True):
+def get_a_signal(r, rm, s, x, x2, i=3, low=1., high=.5, bottom=True):
     '''
     2nd Gen reversal signal
     '''
     s1 = rm.rolling(i, min_periods=1).mean()
     s2 = rm.rolling(52, min_periods=13).mean().shift(i)
-    sig = 1. * ((s1 <= -low) & (s2 >= high) & (s > 0))
+    sig = 1. * ((s1 <= -low) & (s2 >= high) & (s > 0) & (x > 0) & (x2 > 0))
     if bottom:
         acc = r.cumsum().ffill()
         ax = acc.rolling(i, min_periods=1).min()
@@ -52,23 +52,27 @@ def get_smx_data():
     u = stocks.get_ftse_smx_universe()
     r = stocks.load_google_returns(data_name='Returns', data_table=stocks.UK_STOCKS)
     r = r.loc[:, r.columns.isin(u.index)]
-    return cross.get_returns(r)
+    rtn, rm, vol, sx = cross.get_returns(r)
+    x, x2, _, _, _, _ = cross.load_momentum_weights('SMX')
+    return rtn, rm, vol, sx, x, x2
 
 
 def get_ftse250_data():
     u = stocks.get_ftse250_universe()
     r = stocks.load_google_returns(data_name='Returns', data_table=stocks.UK_STOCKS)
     r = r.loc[:, r.columns.isin(u.index)]
-    return cross.get_returns(r)
+    rtn, rm, vol, sx = cross.get_returns(r)
+    x, x2, _, _, _, _ = cross.load_momentum_weights('FTSE250')
+    return rtn, rm, vol, sx, x, x2
 
 
-def run_new_smx(r, rm, posvol, s, capital=500):
-    pos1 = get_a_signal(r, rm, s, 2, .3, 1.5)
-    pos2 = get_a_signal(r, rm, s, 6, .3, .3)
-    pos3 = get_a_signal(r, rm, s, 7, .3, .5)
-    pos4 = get_b_signal(r, rm, s, 2, 1.7, 2.2)
-    pos5 = get_b_signal(r, rm, s, 3, 1.6, 2.1)
-    pos6 = get_b_signal(r, rm, s, 7, 1.4, 2.1)
+def run_new_smx(r, rm, posvol, s, x, x2, capital=500):
+    pos1 = get_a_signal(r, rm, s, x, x2, 2, .2, 1.5)
+    pos2 = get_a_signal(r, rm, s, x, x2, 4, .1, .9)
+    pos3 = get_a_signal(r, rm, s, x, x2, 8, .1, .6)
+    pos4 = get_b_signal(r, rm, s, x, x2, 1, 1.1, 2.2)
+    pos5 = get_b_signal(r, rm, s, x, x2, 4, 1.2, 1.8)
+    pos6 = get_b_signal(r, rm, s, x, x2, 7, 1.3, 1.7)
     sig_date = pos1.index[-1]
     pos1 = (1. / posvol)[pos1 > 0].ffill(limit=3)
     pos2 = (1. / posvol)[pos2 > 0].ffill(limit=3)
@@ -103,23 +107,23 @@ def run_new_smx(r, rm, posvol, s, capital=500):
     pnl = pnl.sum(axis=1)
     pnl.name = 'A2'
     pnl2 = pnl2.sum(axis=1)
-    pnl2.name = 'A6'
+    pnl2.name = 'A4'
     pnl3 = pnl3.sum(axis=1)
-    pnl3.name = 'A7'
+    pnl3.name = 'A8'
     pnl4 = pnl4.sum(axis=1)
-    pnl4.name = 'B2'
+    pnl4.name = 'B1'
     pnl5 = pnl5.sum(axis=1)
-    pnl5.name = 'B3'
+    pnl5.name = 'B4'
     pnl6 = pnl6.sum(axis=1)
     pnl6.name = 'B7'
     return p1, p2, p3, p4, p5, p6, sig_date, pnl, pnl2, pnl3, pnl4, pnl5, pnl6
 
 
-def run_ftse250(r, rm, posvol, s, capital=500):
-    pos1 = get_a_signal(r, rm, s, 4, .4, .8, bottom=False)
-    pos2 = get_a_signal(r, rm, s, 6, .3, .4, bottom=False)
-    pos3 = get_b_signal(r, rm, s, 4, 2.9, 1.7, bottom=False)
-    pos4 = get_b_signal(r, rm, s, 6, 2.8, 1.5, bottom=False)
+def run_ftse250(r, rm, posvol, s, x, x2, capital=500):
+    pos1 = get_a_signal(r, rm, s, x, x2, 1, .3, .6)
+    pos2 = get_a_signal(r, rm, s, x, x2, 2, .3, .9)
+    pos3 = get_b_signal(r, rm, s, x, x2, 1, 2.2, 1.2)
+    pos4 = get_b_signal(r, rm, s, x, x2, 2, 2., 1.3)
     sig_date = pos1.index[-1]
     pos1 = (1. / posvol)[pos1 > 0].ffill(limit=3)
     pos2 = (1. / posvol)[pos2 > 0].ffill(limit=3)
@@ -142,11 +146,11 @@ def run_ftse250(r, rm, posvol, s, capital=500):
     p4.columns = ['Position', 'PnL']
     p4 = p4.loc[~p4.Position.isnull()]
     pnl = pnl.sum(axis=1)
-    pnl.name = 'A4'
+    pnl.name = 'A1'
     pnl2 = pnl2.sum(axis=1)
-    pnl2.name = 'A6'
+    pnl2.name = 'A2'
     pnl3 = pnl3.sum(axis=1)
-    pnl3.name = 'B4'
+    pnl3.name = 'B1'
     pnl4 = pnl4.sum(axis=1)
-    pnl4.name = 'B6'
+    pnl4.name = 'B2'
     return p1, p2, p3, p4, sig_date, pnl, pnl2, pnl3, pnl4

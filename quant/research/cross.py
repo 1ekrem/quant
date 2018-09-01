@@ -3,8 +3,7 @@ from quant.data import stocks
 from quant.lib import portfolio_utils as pu, visualization_utils as vu, timeseries_utils as tu
 from matplotlib import pyplot as plt
 from quant.lib.timeseries_utils import fit_data
-from numpy.distutils.log import good
-from numpy.ma.core import get_data
+from statsmodels import api as sm
 
 
 PATH = os.path.expanduser('~/TempWork/cross/')
@@ -46,7 +45,7 @@ def get_returns(r):
     return rtn, rm, vol2, sx
 
 
-def get_pos(s1, s2, vol, high, low, acc, ax, s, x, bottom=True, shock=False, enhance=True):
+def get_pos(s1, s2, vol, high, low, acc, ax, s, x, x2, bottom=True, shock=False, enhance=True):
     if bottom:
         pos = 1. * ((s1 <= -low) & (s2 >= high) & (acc == ax))
     else:
@@ -54,18 +53,21 @@ def get_pos(s1, s2, vol, high, low, acc, ax, s, x, bottom=True, shock=False, enh
     if shock:
         pos = pos[s > 0]
     if enhance:
-        pos = pos[x > 0]
+        pos = pos[(x > 0) & (x2 > 0)]
     pos = pos.divide(vol)
     return pos
 
 
-def get_pnl(s1, s2, r, vol, high, low, acc, ax, s, x, bottom=True, shock=False, enhance=True, holding_period=3):
-    p = get_pos(s1, s2, vol, high, low, acc, ax, s, x, bottom, shock, enhance)
+def get_pnl(s1, s2, r, vol, high, low, acc, ax, s, x, x2, bottom=True, shock=False, enhance=True, holding_period=3):
+    p = get_pos(s1, s2, vol, high, low, acc, ax, s, x, x2, bottom, shock, enhance)
     if p.abs().sum(axis=1).sum() > 0:
         p = p[p.abs() > 0].ffill(limit=holding_period)
         g = p.abs().sum(axis=1)
+        g = g[g > 0]
+        mg = 3 / .05
+        g[g < mg] = mg
         pnl = r.mul(p.shift()).sum(axis=1)
-        pnl /= g.shift()
+        pnl = pnl / g.shift()
         pnl = _get_first(pnl).fillna(0.)
         return pnl
     else:
@@ -79,8 +81,8 @@ def get_svd_loadings(rm):
     return pd.DataFrame(u, index=rm.columns).iloc[:, :len(s)]
 
 
-def get_stock_stm(rm):
-    m = rm.rolling(8).sum()
+def get_stock_mom(rm, lookback=8):
+    m = rm.rolling(lookback, min_periods=4).sum()
     return np.sign(m.subtract(m.mean(axis=1), axis=0))
 
 
@@ -96,9 +98,40 @@ def get_stmom_weight(u, rm, sm, lookback=1):
     return np.sign(u).mul(ans, axis=1).sum(axis=1)
 
 
-def calc_stmom_weights(rm, lookback=1):
+def get_ltmom_weight(u, rm, lm, lookback=1):
     ans = []
-    stm = get_stock_stm(rm)
+    for i in xrange(len(u.columns)):
+        x = lm.mul(np.sign(u).iloc[:, i], axis=1)
+        good = rm.rolling(lookback, min_periods=1).sum().mul(lm[x > 0].shift(lookback)).sum(axis=0).sum()
+        bad = rm.rolling(lookback, min_periods=1).sum().mul(lm[x < 0].shift(lookback)).sum(axis=0).sum()
+        ans.append(good - bad)
+    ans = np.array(ans)
+    ans /= np.sum(np.abs(ans))
+    return np.sign(u).mul(ans, axis=1).sum(axis=1)
+
+
+def get_neutral_returns(rm, stm, ltm):
+    ans = []
+    for idx in rm.index:
+        y = rm.loc[idx].fillna(0.)
+        x = pd.concat([stm.loc[idx], ltm.loc[idx]], axis=1).fillna(0.)
+        x = x.loc[:, (x.abs() > 0).any(axis=0)]
+        if x.empty:
+            ans.append(y)
+        else:
+            m = sm.OLS(y, sm.add_constant(x))
+            res = m.fit()
+            r = res.resid
+            r.name = idx
+            ans.append(r)
+    return pd.concat(ans, axis=1).T
+
+
+def calc_momentum_weights(rm, lookback=4):
+    ans = []
+    ans2 = []
+    stm = get_stock_mom(rm, 8)
+    ltm = get_stock_mom(rm, 52).shift(8)
     for i in xrange(52, len(rm)):
         idx = rm.index[i]
         logger.info(idx.strftime('Running %Y-%m-%d'))
@@ -107,32 +140,39 @@ def calc_stmom_weights(rm, lookback=1):
         w = get_stmom_weight(u, r, stm.iloc[i-52:i], lookback)
         w.name = idx
         ans.append(w)
+        w2 = get_ltmom_weight(u, r, ltm.iloc[i-52:i], lookback)
+        w2.name = idx
+        ans2.append(w2)
     ans = pd.concat(ans, axis=1).T
-    x = stm.mul(ans)
-    good = rm.mul(stm[x > 0].shift()).sum(axis=1)
-    bad = rm.mul(stm[x < 0].shift()).sum(axis=1)
-    return ans, x, good, bad
+    ans2 = pd.concat(ans2, axis=1).T
+    ans = stm.mul(ans)
+    ans2 = ltm.mul(ans2)
+    good = rm.mul(stm[ans > 0].shift()).sum(axis=1)
+    bad = rm.mul(stm[ans < 0].shift()).sum(axis=1)
+    good2 = rm.mul(ltm[ans2 > 0].shift()).sum(axis=1)
+    bad2 = rm.mul(ltm[ans2 < 0].shift()).sum(axis=1)
+    return ans, ans2, good, bad, good2, bad2
 
 
-def cache_stmom_weights(universe='SMX'):
-    filename = PATH + '%s_stmom.dat' % universe
+def cache_momentum_weights(universe='SMX'):
+    filename = PATH + '%s_mom.dat' % universe
     rtn, rm, vol, sx = get_dataset(universe)
-    write_pickle(calc_stmom_weights(rm), filename)
+    write_pickle(calc_momentum_weights(rm), filename)
 
 
-def load_stmom_weights(universe='SMX'):
-    filename = PATH + '%s_stmom.dat' % universe
+def load_momentum_weights(universe='SMX'):
+    filename = PATH + '%s_mom.dat' % universe
     return load_pickle(filename)
 
 
 # Lookback, timing bottom
-def run_long(rtn, rm, vol, sx, x, i, start_date, end_date, style='A', bottom=True, shock=False, enhance=True, holding_period=3):
+def run_long(rtn, rm, vol, sx, x, x2, i, start_date, end_date, style='A', bottom=True, shock=False, enhance=True, holding_period=3):
     if style == 'A':
-        l = np.arange(.3, 2.01, .1)
+        l = np.arange(0., 1.51, .1)
         s1 = rm.rolling(i, min_periods=1).mean().loc[rtn.index]
         s2 = rm.rolling(52, min_periods=13).mean().shift(i).loc[rtn.index]
     elif style == 'B':
-        l = np.arange(.5, 3.01, .1)
+        l = np.arange(1., 2.51, .1)
         s1 = rm.rolling(i, min_periods=1).mean().loc[rtn.index] * np.sqrt(1. * i)
         s2 = rm.rolling(52, min_periods=13).mean().shift(i).loc[rtn.index] * np.sqrt(52.)
     acc = rtn.cumsum()
@@ -145,7 +185,7 @@ def run_long(rtn, rm, vol, sx, x, i, start_date, end_date, style='A', bottom=Tru
     df = -1.
     for high in l:
         for low in l:
-            pnl = get_pnl(s1, s2, rtn, vol, high, low, acc, ax, sx, x, bottom, shock, enhance, holding_period=holding_period)
+            pnl = get_pnl(s1, s2, rtn, vol, high, low, acc, ax, sx, x, x2, bottom, shock, enhance, holding_period=holding_period)
             if pnl is not None:
                 pnl = pnl[start_date:]
                 tot = pnl.mean()
@@ -164,13 +204,13 @@ def run_long(rtn, rm, vol, sx, x, i, start_date, end_date, style='A', bottom=Tru
 def estimate_reversal(universe='SMX', start_date=dt(2009, 1, 1), end_date=dt(2015, 12, 31), style='A', bottom=True,
                       shock=False, enhance=True, holding_period=3):
     rtn, rm, vol, sx = get_dataset(universe)
-    _, x, _, _ = load_stmom_weights(universe)
+    x, x2, _, _, _, _ = load_momentum_weights(universe)
     ana = []
     params = pd.DataFrame([])
     plt.figure(figsize=(10, 7))
     for i in xrange(1, 14):
         logger.info('Lookback %d' % i)
-        pnl, mu, df, ans_high, ans_low = run_long(rtn, rm, vol, sx, x, i, start_date, end_date, style, bottom, shock,
+        pnl, mu, df, ans_high, ans_low = run_long(rtn, rm, vol, sx, x, x2, i, start_date, end_date, style, bottom, shock,
                                enhance, holding_period=holding_period)
         if pnl is not None:
             pnl.plot()
@@ -182,7 +222,7 @@ def estimate_reversal(universe='SMX', start_date=dt(2009, 1, 1), end_date=dt(201
     style_text = style_text + 'E' if enhance else style_text
     plt.title('%s %s %s' % (universe, style_text, 'Bt' if bottom else 'All'), weight='bold')
     plt.tight_layout()
-    plt.savefig(PATH + '%s_%s_%s_%d.png' % (universe, style_text, 'Bt' if bottom else 'All', start_date.year))
+    plt.savefig(PATH + '%s_%s_%s_%d2.png' % (universe, style_text, 'Bt' if bottom else 'All', start_date.year))
     plt.close()
     plt.figure()
     vu.bar_plot(pd.DataFrame(ana, index=np.arange(1, 14), columns=['Mean', 'Decay']).T)
@@ -190,7 +230,7 @@ def estimate_reversal(universe='SMX', start_date=dt(2009, 1, 1), end_date=dt(201
     plt.axhline(.35, color='grey', ls='--')
     plt.title('%s %s %s' % (universe, style_text, 'Bt' if bottom else 'All'), weight='bold')
     plt.tight_layout()
-    plt.savefig(PATH + '%s_%s_%s_%d_decay.png' % (universe, style_text, 'Bt' if bottom else 'All', start_date.year))
+    plt.savefig(PATH + '%s_%s_%s_%d_decay2.png' % (universe, style_text, 'Bt' if bottom else 'All', start_date.year))
     plt.close()
     write_pickle(params, PATH + '%s_%s_%s.dat' % (universe, style_text, 'Bt' if bottom else 'All'))
 
@@ -198,8 +238,8 @@ def estimate_reversal(universe='SMX', start_date=dt(2009, 1, 1), end_date=dt(201
 def run_all():
     for universe in ['SMX', 'FTSE250']:
         for style in ['A', 'B']:
-            for bottom in [True, False]:
-                for shock in [True, False]:
+            for bottom in [True]:
+                for shock in [True]:
                     estimate_reversal(universe, style=style, bottom=bottom, shock=shock, enhance=True)
 
 
@@ -217,7 +257,7 @@ def get_long_pos(rtn, rm, vol, sx, i, start_date, high, low, style='A', bottom=T
     elif style == 'B':
         l = np.arange(.5, 3.01, .1)
         s1 = rm.rolling(i, min_periods=1).mean().loc[rtn.index] * np.sqrt(1. * i)
-        s2 = rm.rolling(52, min_periods=13).mean().shift(i).loc[rtn.index] * np.sqrt(52.)    
+        s2 = rm.rolling(52, min_periods=13).mean().shift(i).loc[rtn.index] * np.sqrt(52.)
     acc = rtn.cumsum()
     ax = acc.rolling(i, min_periods=1).min()
     return get_pos(s1, s2, vol, high, low, acc, ax, sx, bottom, shock)[start_date:]
@@ -264,35 +304,14 @@ def test_all():
                     test_reversal(universe, style=style, bottom=bottom, shock=shock)
 
 
-def run_trace(universe='SMX', start_date=dt(2009, 1, 1), end_date=dt(2015, 12, 31), style='A', bottom=True):
-    r = stocks.load_google_returns(data_table=stocks.UK_STOCKS)
-    u = stocks.get_universe(universe)
-    r = r.loc[:, r.columns.isin(u.index)]
-    rtn, rv, rm, vol, sx = get_returns(r)
-    fr = [rtn.rolling(i, min_periods=1).sum().shift(-i) for i in xrange(1, 14)]
-    plt.figure(figsize=(14, 7))
-    for i in xrange(1, 13):
-        plt.subplot(3, 4, i)
-        logger.info('Lookback %d' % i)
-        pos = run_long_pos(rtn, rm, vol, i, start_date, end_date, style, bottom)
-        if pos is not None:
-            tmp = []
-            for x in fr:
-                y = tu.get_observations(pos.mul(tu.fit_data(x, pos)).fillna(0.), pos)
-                tmp.append([np.mean(y)] + list(np.percentile(y, [10, 30, 70, 90])))
-            tmp = pd.DataFrame(tmp, index=np.arange(len(tmp)) + 1, columns=['Average', '30%', '40%', '60%', '70%'])
-            plt.fill_between(tmp.index, tmp['30%'], tmp['70%'], color='green', alpha=0.2)
-            plt.fill_between(tmp.index, tmp['40%'], tmp['60%'], color='green', alpha=0.4)
-            plt.plot(tmp.index, tmp.Average, lw=2, color='green')
-            plt.ylim((tmp.Average.min() - .05, tmp.Average.max() + .05))
-            plt.title(i, weight='bold')
-    plt.tight_layout()
-    plt.savefig(PATH + '%s_%s_%s_%d_trace.png' % (universe, style, 'Bt' if bottom else 'All', start_date.year))
-    plt.close()
+def cache_momentum():
+    for u in ['SMX', 'FTSE250']:
+        cache_momentum_weights(u)
 
 
-def run_all_traces():
-    for universe in ['SMX', 'FTSE250']:
-        for style in ['A', 'B']:
-            for bottom in [True, False]:
-                run_trace(universe, style=style, bottom=bottom)
+def main():
+    cache_momentum()
+
+
+if __name__ == '__main__':
+    main()
