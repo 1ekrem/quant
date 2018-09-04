@@ -14,11 +14,9 @@ def get_week_table(r):
 def get_reversal_table(rm):
     rtn = pd.concat([rm.rolling(4, min_periods=1).mean().iloc[-1], rm.rolling(52, min_periods=13).mean().iloc[-5]], axis=1)
     rtn.columns = ['Rev', 'Mom']
-    rtn = rtn.sort_values('Rev', ascending=True).iloc[:, :20]
-    rtn.loc[:, 'Rev'] = ['%.1f%%' % (100. * x) for x in rtn.Rev]
-    rtn.loc[:, 'Mom'] = ['%.1f%%' % (100. * x) for x in rtn.Mom]
+    rtn = rtn[rtn.Mom > 0].sort_values('Rev', ascending=True).iloc[:20]
     rtn.index.name = 'Ticker'
-    return rtn
+    return np.round(rtn, 1)
     
 
 def run_check():
@@ -30,12 +28,14 @@ def run_check():
     table4 = get_reversal_table(rm)
     mail = Email('wayne.cq@hotmail.com', ['wayne.cq@hotmail.com'], 'Market Watch')
     mail.add_date(dt.today())
-    mail.add_text('SMX')
+    mail.add_text('SMX Week')
     mail.add_table(table, width=400)
-    mail.add_table(table2, width=600)
-    mail.add_text('FTSE250')
+    mail.add_text('SMX Momentum')
+    mail.add_table(table2, width=500)
+    mail.add_text('FTSE250 Week')
     mail.add_table(table3, width=400)
-    mail.add_table(table4, width=600)
+    mail.add_text('FTSE250 Momentum')
+    mail.add_table(table4, width=500)
     mail.send_email()
 
 

@@ -41,7 +41,7 @@ def run_smx_check(capital=200):
     pnl_idx = capital * r.mean(axis=1)
     pnl_idx.name = 'Index'
     table = np.round(100. * pd.concat([pnl, pnl2, pnl3, pnl4, pnl5, pnl6, pnl_idx], axis=1).iloc[-6:], 2)
-    table.columns = ['A3 (%)', 'A4 (%)', 'A8 (%)', 'B3 (%)', 'B4 (%)', 'B8 (%)', 'Index (%)']
+    table.columns = ['A3 (%)', 'A4 (%)', 'A7 (%)', 'B3 (%)', 'B4 (%)', 'B8 (%)', 'Index (%)']
     table.index = [x.strftime('%Y-%m-%d') for x in table.index]
     table2 = np.round(pos.fillna(0.))
     table3 = np.round(pos2.fillna(0.))
@@ -59,7 +59,7 @@ def run_smx_check(capital=200):
     mail.add_table(table2, width=400)
     mail.add_text('A4 Positions')
     mail.add_table(table3, width=400)
-    mail.add_text('A8 Positions')
+    mail.add_text('A7 Positions')
     mail.add_table(table4, width=400)
     mail.add_text('B3 Positions')
     mail.add_table(table5, width=400)
@@ -76,7 +76,7 @@ def run_ftse250_check(capital=200):
     pnl_idx = capital * r.mean(axis=1)
     pnl_idx.name = 'Index'
     table = np.round(100. * pd.concat([pnl, pnl2, pnl3, pnl4, pnl_idx], axis=1).iloc[-6:], 2)
-    table.columns = ['A2 (%)', 'A4 (%)', 'B2 (%)', 'B5 (%)', 'Index (%)']
+    table.columns = ['A4 (%)', 'A6 (%)', 'B5 (%)', 'B6 (%)', 'Index (%)']
     table.index = [x.strftime('%Y-%m-%d') for x in table.index]
     table2 = np.round(pos.fillna(0.))
     table3 = np.round(pos2.fillna(0.))
@@ -88,13 +88,13 @@ def run_ftse250_check(capital=200):
     mail.add_image(filename, 600, 400)
     mail.add_text('PnL Summary', bold=True)
     mail.add_table(table, width=700)
-    mail.add_text('A2 Positions')
-    mail.add_table(table2, width=400)
     mail.add_text('A4 Positions')
+    mail.add_table(table2, width=400)
+    mail.add_text('A6 Positions')
     mail.add_table(table3, width=400)
-    mail.add_text('B2 Positions')
-    mail.add_table(table4, width=400)
     mail.add_text('B5 Positions')
+    mail.add_table(table4, width=400)
+    mail.add_text('B6 Positions')
     mail.add_table(table5, width=400)
     mail.send_email()
 

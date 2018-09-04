@@ -63,11 +63,11 @@ def get_ftse250_data():
 
 
 def run_new_smx(r, rm, posvol, x, x2, capital=500):
-    pos1 = get_a_signal(r, rm, x, x2, 3, .2, 1.1)
-    pos2 = get_a_signal(r, rm, x, x2, 4, .2, 1.)
-    pos3 = get_a_signal(r, rm, x, x2, 8, .1, .7)
-    pos4 = get_b_signal(r, rm, x, x2, 3, 1.5, 1.7)
-    pos5 = get_b_signal(r, rm, x, x2, 4, 1.5, 2.3)
+    pos1 = get_a_signal(r, rm, x, x2, 3, .2, 1.2)
+    pos2 = get_a_signal(r, rm, x, x2, 4, .2, .9)
+    pos3 = get_a_signal(r, rm, x, x2, 7, .2, .8)
+    pos4 = get_b_signal(r, rm, x, x2, 3, 1.5, 2.)
+    pos5 = get_b_signal(r, rm, x, x2, 4, 1.3, 1.8)
     pos6 = get_b_signal(r, rm, x, x2, 8, 1., 2.)
     sig_date = pos1.index[-1]
     pos1 = (1. / posvol)[pos1 > 0].ffill(limit=3)
@@ -105,7 +105,7 @@ def run_new_smx(r, rm, posvol, x, x2, capital=500):
     pnl2 = pnl2.sum(axis=1)
     pnl2.name = 'A4'
     pnl3 = pnl3.sum(axis=1)
-    pnl3.name = 'A8'
+    pnl3.name = 'A7'
     pnl4 = pnl4.sum(axis=1)
     pnl4.name = 'B3'
     pnl5 = pnl5.sum(axis=1)
@@ -116,10 +116,10 @@ def run_new_smx(r, rm, posvol, x, x2, capital=500):
 
 
 def run_ftse250(r, rm, posvol, x, x2, capital=500):
-    pos1 = get_a_signal(r, rm, x, x2, 2, .3, .9)
-    pos2 = get_a_signal(r, rm, x, x2, 4, .4, .6)
-    pos3 = get_b_signal(r, rm, x, x2, 2, 1.8, 1.3)
-    pos4 = get_b_signal(r, rm, x, x2, 5, 1.1, 2.1)
+    pos1 = get_a_signal(r, rm, x, x2, 4, .3, .8)
+    pos2 = get_a_signal(r, rm, x, x2, 6, .2, .3)
+    pos3 = get_b_signal(r, rm, x, x2, 5, 1.2, 1.9)
+    pos4 = get_b_signal(r, rm, x, x2, 6, 1.6, 1.6)
     sig_date = pos1.index[-1]
     pos1 = (1. / posvol)[pos1 > 0].ffill(limit=3)
     pos2 = (1. / posvol)[pos2 > 0].ffill(limit=3)
@@ -142,11 +142,11 @@ def run_ftse250(r, rm, posvol, x, x2, capital=500):
     p4.columns = ['Position', 'PnL']
     p4 = p4.loc[~p4.Position.isnull()]
     pnl = pnl.sum(axis=1)
-    pnl.name = 'A2'
+    pnl.name = 'A4'
     pnl2 = pnl2.sum(axis=1)
-    pnl2.name = 'A4'
+    pnl2.name = 'A6'
     pnl3 = pnl3.sum(axis=1)
-    pnl3.name = 'B2'
+    pnl3.name = 'B5'
     pnl4 = pnl4.sum(axis=1)
-    pnl4.name = 'B5'
+    pnl4.name = 'B6'
     return p1, p2, p3, p4, sig_date, pnl, pnl2, pnl3, pnl4
