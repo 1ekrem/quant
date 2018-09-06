@@ -50,18 +50,16 @@ def get_dataset(universe, max_rtn=None):
     return get_returns(r, max_rtn=max_rtn)
 
 
-def get_pos(s1, s2, vol, high, low, x, x2, x3, x4, enhance=True, blind_enhance=True):
+def get_pos(s1, s2, vol, high, low, x, enhance=True):
     pos = 1. * ((s1 <= -low) & (s2 >= high))
     if enhance:
-        pos = pos[(x > 0) & (x2 > 0)]
-    if blind_enhance:
-        pos = pos[(x3 > 0) & (x4 > 0)]
+        pos = pos[x > 0]
     pos = pos.divide(vol)
     return pos
 
 
-def get_pnl(s1, s2, r, vol, high, low, x, x2, x3, x4, enhance=True, blind_enhance=True, holding_period=3):
-    p = get_pos(s1, s2, vol, high, low, x, x2, x3, x4, enhance, blind_enhance)
+def get_pnl(s1, s2, r, vol, high, low, x, enhance=True, holding_period=3):
+    p = get_pos(s1, s2, vol, high, low, x, enhance)
     if p.abs().sum(axis=1).sum() > 0:
         p = p[p.abs() > 0].ffill(limit=holding_period)
         g = p.abs().sum(axis=1).fillna(0.)
@@ -253,9 +251,9 @@ def plot_blind_momentum(universe='SMX'):
 
 
 # Lookback, timing bottom
-def run_long(rtn, rm, vol, x, x2, x3, x4, i, start_date, end_date, style='A', enhance=True, blind_enhance=True, holding_period=3):
+def run_long(rtn, rm, vol, x, i, start_date, end_date, style='A', enhance=True, holding_period=3):
     run_set = []
-    if style == 'A':
+    if style in ['A', 'C']:
         l = np.arange(0.2, 1.21, .1)
         s1 = rm.rolling(i, min_periods=1).mean().loc[rtn.index]
         s2 = rm.rolling(52, min_periods=13).mean().shift(i).loc[rtn.index]
@@ -263,7 +261,7 @@ def run_long(rtn, rm, vol, x, x2, x3, x4, i, start_date, end_date, style='A', en
             for low in l:
                 if high <= low:
                     run_set.append((high, low))
-    elif style == 'B':
+    elif style in ['B', 'D']:
         l = np.arange(1., 2.01, .1)
         s1 = rm.rolling(i, min_periods=1).mean().loc[rtn.index] * np.sqrt(1. * i)
         s2 = rm.rolling(52, min_periods=13).mean().shift(i).loc[rtn.index] * np.sqrt(52.)
@@ -272,7 +270,7 @@ def run_long(rtn, rm, vol, x, x2, x3, x4, i, start_date, end_date, style='A', en
                 if high <= low:
                     run_set.append((high, low))
     acc = rtn.cumsum()
-    ax = acc.rolling(i, min_periods=1).min()
+    ax = acc.rolling(4, min_periods=1).min()
     s1 = s1[acc == ax]
     s2 = s2[acc == ax]
     ans = None 
@@ -282,7 +280,7 @@ def run_long(rtn, rm, vol, x, x2, x3, x4, i, start_date, end_date, style='A', en
     mu = -1.
     df = -1.
     for high, low in run_set:
-        pnl = get_pnl(s1, s2, rtn, vol, high, low, x, x2, x3, x4, enhance, blind_enhance, holding_period=holding_period)
+        pnl = get_pnl(s1, s2, rtn, vol, high, low, x, enhance, holding_period=holding_period)
         if pnl is not None:
             pnl = pnl[start_date:]
             tot = pnl.mean() - .5 * pnl.std() ** 2
@@ -299,17 +297,17 @@ def run_long(rtn, rm, vol, x, x2, x3, x4, i, start_date, end_date, style='A', en
 
     
 def estimate_reversal(universe='SMX', start_date=dt(2009, 1, 1), end_date=dt(2015, 12, 31), style='A',
-                      enhance=True, blind_enhance=True, holding_period=3):
+                      enhance=True, holding_period=3):
     rtn, rm, vol = get_dataset(universe)
     x, x2, _, _, _, _ = load_momentum_weights(universe)
-    x3, x4, _, _, _, _ = load_blind_momentum(universe)
+    x = x[x2 > 0]
     ana = []
     params = pd.DataFrame([])
     plt.figure(figsize=(10, 7))
     for i in xrange(1, 14):
         logger.info('Lookback %d' % i)
-        pnl, mu, df, ans_high, ans_low = run_long(rtn, rm, vol, x, x2, x3, x4, i, start_date, end_date, style,
-                               enhance, blind_enhance, holding_period=holding_period)
+        pnl, mu, df, ans_high, ans_low = run_long(rtn, rm, vol, x, i, start_date, end_date, style,
+                               enhance, holding_period=holding_period)
         if pnl is not None:
             pnl.plot()
             ana.append([mu, df])
@@ -317,7 +315,6 @@ def estimate_reversal(universe='SMX', start_date=dt(2009, 1, 1), end_date=dt(201
             params.loc[i, 'low'] = ans_low
     plt.legend(loc='best', frameon=False)
     style_text = style + 'E' if enhance else style
-    style_text = style_text + 'B' if blind_enhance else style_text
     plt.title('%s %s' % (universe, style_text), weight='bold')
     plt.tight_layout()
     plt.savefig(PATH + '%s_%s_%d.png' % (universe, style_text, start_date.year))
@@ -337,7 +334,7 @@ def run_all():
     for universe in ['SMX', 'FTSE250']:
         for style in ['A', 'B']:
             for enhance in [True, False]:
-                estimate_reversal(universe, style=style, enhance=enhance, blind_enhance=True)
+                estimate_reversal(universe, style=style, enhance=enhance)
 
 
 def load_params(universe, style, enhance):

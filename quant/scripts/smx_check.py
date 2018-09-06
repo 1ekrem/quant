@@ -41,7 +41,7 @@ def run_smx_check(capital=200):
     pnl_idx = capital * r.mean(axis=1)
     pnl_idx.name = 'Index'
     table = np.round(100. * pd.concat([pnl, pnl2, pnl3, pnl4, pnl5, pnl6, pnl_idx], axis=1).iloc[-6:], 2)
-    table.columns = ['A3 (%)', 'A4 (%)', 'A7 (%)', 'B3 (%)', 'B4 (%)', 'B8 (%)', 'Index (%)']
+    table.columns = ['A3 (%)', 'A4 (%)', 'A7 (%)', 'B3 (%)', 'B4 (%)', 'B7 (%)', 'Index (%)']
     table.index = [x.strftime('%Y-%m-%d') for x in table.index]
     table2 = np.round(pos.fillna(0.))
     table3 = np.round(pos2.fillna(0.))
@@ -65,7 +65,7 @@ def run_smx_check(capital=200):
     mail.add_table(table5, width=400)
     mail.add_text('B4 Positions')
     mail.add_table(table6, width=400)
-    mail.add_text('B8 Positions')
+    mail.add_text('B7 Positions')
     mail.add_table(table7, width=400)
     mail.send_email()
 
