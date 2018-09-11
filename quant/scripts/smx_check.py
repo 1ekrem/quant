@@ -36,8 +36,8 @@ def plot_pnl(pnls):
 
 
 def run_smx_check(capital=200):
-    r, v, v2, x, x2 = sm.get_smx_data()
-    pos, pos2, pos3, pos4, pos5, pos6, sig_date, pnl, pnl2, pnl3, pnl4, pnl5, pnl6 = sm.run_new_smx(r, v, v2, x, x2, capital=capital)
+    r, v, v2, x = sm.get_smx_data()
+    pos, pos2, pos3, pos4, pos5, pos6, sig_date, pnl, pnl2, pnl3, pnl4, pnl5, pnl6 = sm.run_new_smx(r, v, v2, x, capital=capital)
     pnl_idx = capital * r.mean(axis=1)
     pnl_idx.name = 'Index'
     table = np.round(100. * pd.concat([pnl, pnl2, pnl3, pnl4, pnl5, pnl6, pnl_idx], axis=1).iloc[-6:], 2)
@@ -71,8 +71,8 @@ def run_smx_check(capital=200):
 
 
 def run_ftse250_check(capital=200):
-    r, v, v2, x, x2 = sm.get_ftse250_data()
-    pos, pos2, pos3, pos4, sig_date, pnl, pnl2, pnl3, pnl4 = sm.run_ftse250(r, v, v2, x, x2, capital=capital)
+    r, v, v2, x = sm.get_ftse250_data()
+    pos, pos2, pos3, pos4, sig_date, pnl, pnl2, pnl3, pnl4 = sm.run_ftse250(r, v, v2, x, capital=capital)
     pnl_idx = capital * r.mean(axis=1)
     pnl_idx.name = 'Index'
     table = np.round(100. * pd.concat([pnl, pnl2, pnl3, pnl4, pnl_idx], axis=1).iloc[-6:], 2)
