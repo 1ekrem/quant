@@ -1,6 +1,6 @@
 from quant.lib.main_utils import *
 from quant.data import stocks
-from quant.lib import portfolio_utils as pu, visualization_utils as vu, timeseries_utils as tu
+from quant.lib import portfolio_utils as pu, visualization_utils as vu, timeseries_utils as tu, machine_learning_utils as mu
 from matplotlib import pyplot as plt
 from scipy import stats as ss
 from quant.lib.timeseries_utils import fit_data
@@ -95,8 +95,8 @@ def get_stmom_weight(u, rm, sm, lookback=1):
     ans = np.array(ans)
     ans /= np.sum(np.abs(ans))
     return np.sign(u).mul(ans, axis=1).sum(axis=1)
-
-
+        
+        
 def get_ltmom_weight(u, rm, lm, lookback=1):
     ans = []
     for i in xrange(len(u.columns)):
@@ -174,25 +174,41 @@ def get_blind_momentum(rm, u, lookback=4):
         r2.append(tmp2)
     r = pd.concat(r, axis=1).T.loc[:, u.columns]
     r2 = pd.concat(r2, axis=1).T
-    stm = u.mul(r.iloc[-lookback:].mean(axis=0), axis=1).sum(axis=1)
-    ltm = u.mul(r.iloc[:-lookback].mean(axis=0), axis=1).sum(axis=1)
+    stm = u.mul(r.iloc[-3:].sum(), axis=1).sum(axis=1)
+    ltm = u.mul(r.iloc[:-3].sum(), axis=1).sum(axis=1)
+    stm2 = r2.iloc[-3:].sum()
+    ltm2 = r2.iloc[:-3].sum()
     stm.name = rm.index[-1]
     ltm.name = rm.index[-1]
-    stm2 = r2.iloc[-lookback:].mean(axis=0)
-    ltm2 = r2.iloc[:-lookback].mean(axis=0)
     stm2.name = rm.index[-1]
     ltm2.name = rm.index[-1]
     return stm, ltm, stm2, ltm2
 
 
 def calc_blind_momentum(rtn, rm, vol):
-    m_s = rm.rolling(52, min_periods=1).sum().shift(4)
-    rs = get_neutral_returns(rm, m_s)
-    stm = get_stock_mom(rs, 3).divide(vol)
-    ltm = get_stock_mom(rs, 52).shift(3).divide(vol)
-    s = rtn.mul(stm.shift()).sum(axis=1) / stm.abs().sum(axis=1).shift()
-    l = rtn.mul(ltm.shift()).sum(axis=1) / ltm.abs().sum(axis=1).shift()
-    return m_s, stm, ltm, s, l
+    ans = []
+    ans2 = []
+    ans3 = []
+    ans4 = []
+    for i in xrange(52, len(rm)):
+        idx = rm.index[i]
+        logger.info(idx.strftime('Running %Y-%m-%d'))
+        r = rm.iloc[i-52:i]
+        u = get_svd_loadings(r)
+        stm, ltm, stm2, ltm2 = get_blind_momentum(r, u, 3)
+        ans.append(stm)
+        ans2.append(ltm)
+        ans3.append(stm2)
+        ans4.append(ltm2)
+    ans = np.sign(pd.concat(ans, axis=1).T).divide(vol)
+    ans2 = np.sign(pd.concat(ans2, axis=1).T).divide(vol)
+    ans3 = np.sign(pd.concat(ans3, axis=1).T).divide(vol)
+    ans4 = np.sign(pd.concat(ans4, axis=1).T).divide(vol)
+    s = rtn.mul(ans.shift()).sum(axis=1) / ans.abs().sum(axis=1).shift()
+    l = rtn.mul(ans2.shift()).sum(axis=1) / ans2.abs().sum(axis=1).shift()
+    s2 = rtn.mul(ans3.shift()).sum(axis=1) / ans3.abs().sum(axis=1).shift()
+    l2 = rtn.mul(ans4.shift()).sum(axis=1) / ans4.abs().sum(axis=1).shift()
+    return ans, ans2, s, l, s2, l2
 
 
 def cache_momentum_weights(universe='SMX'):

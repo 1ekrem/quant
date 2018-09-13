@@ -29,13 +29,13 @@ def run_check():
     mail = Email('wayne.cq@hotmail.com', ['wayne.cq@hotmail.com'], 'Market Watch')
     mail.add_date(dt.today())
     mail.add_text('SMX Week')
-    mail.add_table(table, width=400)
+    mail.add_table(table, width=300)
     mail.add_text('SMX Momentum')
-    mail.add_table(table2, width=500)
+    mail.add_table(table2, width=400)
     mail.add_text('FTSE250 Week')
-    mail.add_table(table3, width=400)
+    mail.add_table(table3, width=300)
     mail.add_text('FTSE250 Momentum')
-    mail.add_table(table4, width=500)
+    mail.add_table(table4, width=400)
     mail.send_email()
 
 
