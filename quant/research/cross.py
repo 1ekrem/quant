@@ -160,55 +160,42 @@ def get_neutral_returns(rm, stm):
 
 def get_blind_momentum(rm, u, lookback=4):
     r = []
-    r2 = []
     x = sm.add_constant(u)
     for idx in rm.index:
         y = rm.loc[idx].fillna(0.)
         lm = sm.OLS(y, x)
         m = lm.fit()
-        tmp = m.params
+        tmp = y.subtract(m.resid)
         tmp.name = idx
         r.append(tmp)
-        tmp2 = m.resid
-        tmp2.name = idx
-        r2.append(tmp2)
-    r = pd.concat(r, axis=1).T.loc[:, u.columns]
-    r2 = pd.concat(r2, axis=1).T
-    stm = u.mul(r.iloc[-3:].sum(), axis=1).sum(axis=1)
-    ltm = u.mul(r.iloc[:-3].sum(), axis=1).sum(axis=1)
-    stm2 = r2.iloc[-3:].sum()
-    ltm2 = r2.iloc[:-3].sum()
+    r = pd.concat(r, axis=1).T
+    stm = r.iloc[-3:].sum()
+    ltm = r.iloc[:-3].sum()
     stm.name = rm.index[-1]
     ltm.name = rm.index[-1]
-    stm2.name = rm.index[-1]
-    ltm2.name = rm.index[-1]
-    return stm, ltm, stm2, ltm2
+    return stm, ltm
 
 
 def calc_blind_momentum(rtn, rm, vol):
     ans = []
     ans2 = []
-    ans3 = []
-    ans4 = []
+    stm = get_stock_mom(rm, 3).divide(vol)
+    ltm = get_stock_mom(rm, 52).shift(3).divide(vol)
     for i in xrange(52, len(rm)):
         idx = rm.index[i]
         logger.info(idx.strftime('Running %Y-%m-%d'))
         r = rm.iloc[i-52:i]
         u = get_svd_loadings(r)
-        stm, ltm, stm2, ltm2 = get_blind_momentum(r, u, 3)
-        ans.append(stm)
-        ans2.append(ltm)
-        ans3.append(stm2)
-        ans4.append(ltm2)
-    ans = np.sign(pd.concat(ans, axis=1).T).divide(vol)
-    ans2 = np.sign(pd.concat(ans2, axis=1).T).divide(vol)
-    ans3 = np.sign(pd.concat(ans3, axis=1).T).divide(vol)
-    ans4 = np.sign(pd.concat(ans4, axis=1).T).divide(vol)
-    s = rtn.mul(ans.shift()).sum(axis=1) / ans.abs().sum(axis=1).shift()
-    l = rtn.mul(ans2.shift()).sum(axis=1) / ans2.abs().sum(axis=1).shift()
-    s2 = rtn.mul(ans3.shift()).sum(axis=1) / ans3.abs().sum(axis=1).shift()
-    l2 = rtn.mul(ans4.shift()).sum(axis=1) / ans4.abs().sum(axis=1).shift()
-    return ans, ans2, s, l, s2, l2
+        s, l = get_blind_momentum(r, u, 3)
+        ans.append(s)
+        ans2.append(l)
+    ans = pd.concat(ans, axis=1).T
+    ans2 = pd.concat(ans2, axis=1).T
+    good = rtn.mul(stm[ans > 0].shift()).sum(axis=1) / stm[ans > 0].abs().sum(axis=1).shift()
+    bad = rtn.mul(stm[ans < 0].shift()).sum(axis=1) / stm[ans < 0].abs().sum(axis=1).shift()
+    good2 = rtn.mul(ltm[ans2 > 0].shift()).sum(axis=1) / ltm[ans > 0].abs().sum(axis=1).shift()
+    bad2 = rtn.mul(ltm[ans2 < 0].shift()).sum(axis=1) / ltm[ans < 0].abs().sum(axis=1).shift()
+    return ans, ans2, good, bad, good2, bad2
 
 
 def cache_momentum_weights(universe='SMX'):
@@ -250,10 +237,10 @@ def load_blind_momentum(universe='SMX'):
 def plot_blind_momentum(universe='SMX'):
     a, a2, g, b, g2, b2 = load_blind_momentum(universe)
     plt.figure()
-    g.cumsum().plot(label='F Rev')
-    b.cumsum().plot(label='F Mom')
-    g2.cumsum().plot(label='S Rev')
-    b2.cumsum().plot(label='S Mom')
+    g.cumsum().plot(label='Good Rev')
+    b.cumsum().plot(label='Bad Rev')
+    g2.cumsum().plot(label='Good Mom')
+    b2.cumsum().plot(label='Bad Mom')
     plt.legend(loc='best', frameon=False)
     plt.title(universe, weight='bold')
     plt.tight_layout()
@@ -264,7 +251,7 @@ def plot_blind_momentum(universe='SMX'):
 # Lookback, timing bottom
 def run_long(rtn, rm, vol, x, i, start_date, end_date, style='A', enhance=True, holding_period=3):
     run_set = []
-    if style in ['A', 'C']:
+    if style in ['A']:
         l = np.arange(0.2, 1.21, .1)
         s1 = rm.rolling(i, min_periods=1).mean().loc[rtn.index]
         s2 = rm.rolling(52, min_periods=13).mean().shift(i).loc[rtn.index]
@@ -272,7 +259,7 @@ def run_long(rtn, rm, vol, x, i, start_date, end_date, style='A', enhance=True, 
             for low in l:
                 if high <= low:
                     run_set.append((high, low))
-    elif style in ['B', 'D']:
+    elif style in ['B']:
         l = np.arange(1., 2.01, .1)
         s1 = rm.rolling(i, min_periods=1).mean().loc[rtn.index] * np.sqrt(1. * i)
         s2 = rm.rolling(52, min_periods=13).mean().shift(i).loc[rtn.index] * np.sqrt(52.)
@@ -344,7 +331,7 @@ def estimate_reversal(universe='SMX', start_date=dt(2009, 1, 1), end_date=dt(201
 def run_all():
     for universe in ['SMX', 'FTSE250']:
         for style in ['C', 'D']:
-            for enhance in [True, False]:
+            for enhance in [False]:
                 estimate_reversal(universe, style=style, enhance=enhance)
 
 
