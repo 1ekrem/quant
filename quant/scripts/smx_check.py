@@ -36,66 +36,40 @@ def plot_pnl(pnls):
 
 
 def run_smx_check(capital=200):
-    r, v, v2, x = sm.get_smx_data()
-    pos, pos2, pos3, pos4, pos5, pos6, sig_date, pnl, pnl2, pnl3, pnl4, pnl5, pnl6 = sm.run_new_smx(r, v, v2, x, capital=capital)
-    pnl_idx = capital * r.mean(axis=1)
-    pnl_idx.name = 'Index'
-    table = np.round(100. * pd.concat([pnl, pnl2, pnl3, pnl4, pnl5, pnl6, pnl_idx], axis=1).iloc[-6:], 2)
-    table.columns = ['A3 (%)', 'A4 (%)', 'A7 (%)', 'B3 (%)', 'B4 (%)', 'B7 (%)', 'Index (%)']
+    r, rm, posvol = sm.get_smx_data()
+    sig_date, pos, pnls = sm.run_package(r, rm, posvol, capital)
+    table = np.round(100. * pd.concat(pnls, axis=1).iloc[-6:], 2)
+    table.columns = [x + ' (%)' for x in table.columns]
     table.index = [x.strftime('%Y-%m-%d') for x in table.index]
-    table2 = np.round(pos.fillna(0.))
-    table3 = np.round(pos2.fillna(0.))
-    table4 = np.round(pos3.fillna(0.))
-    table5 = np.round(pos4.fillna(0.))
-    table6 = np.round(pos5.fillna(0.))
-    table7 = np.round(pos6.fillna(0.))
-    filename = plot_pnl([pnl, pnl2, pnl3, pnl4, pnl5, pnl6, pnl_idx])
+    filename = plot_pnl(pnls)
     mail = Email('wayne.cq@hotmail.com', ['wayne.cq@hotmail.com'], 'SMX Stocks')
     mail.add_date(dt.today())
     mail.add_image(filename, 600, 400)
     mail.add_text('PnL Summary', bold=True)
     mail.add_table(table, width=700)
-    mail.add_text('A3 Positions')
-    mail.add_table(table2, width=400)
-    mail.add_text('A4 Positions')
-    mail.add_table(table3, width=400)
-    mail.add_text('A7 Positions')
-    mail.add_table(table4, width=400)
-    mail.add_text('B3 Positions')
-    mail.add_table(table5, width=400)
-    mail.add_text('B4 Positions')
-    mail.add_table(table6, width=400)
-    mail.add_text('B7 Positions')
-    mail.add_table(table7, width=400)
+    for i, x in enumerate(pos):
+        mail.add_text('%s Positions' % pnls[i].name)
+        table2 = np.round(x.fillna(0.))
+        mail.add_table(table2, width=400)
     mail.send_email()
 
 
 def run_ftse250_check(capital=200):
-    r, v, v2, x = sm.get_ftse250_data()
-    pos, pos2, pos3, pos4, sig_date, pnl, pnl2, pnl3, pnl4 = sm.run_ftse250(r, v, v2, x, capital=capital)
-    pnl_idx = capital * r.mean(axis=1)
-    pnl_idx.name = 'Index'
-    table = np.round(100. * pd.concat([pnl, pnl2, pnl3, pnl4, pnl_idx], axis=1).iloc[-6:], 2)
-    table.columns = ['A4 (%)', 'A6 (%)', 'B5 (%)', 'B6 (%)', 'Index (%)']
+    r, rm, posvol = sm.get_ftse250_data()
+    sig_date, pos, pnls = sm.run_package(r, rm, posvol, capital)
+    table = np.round(100. * pd.concat(pnls, axis=1).iloc[-6:], 2)
+    table.columns = [x + ' (%)' for x in table.columns]
     table.index = [x.strftime('%Y-%m-%d') for x in table.index]
-    table2 = np.round(pos.fillna(0.))
-    table3 = np.round(pos2.fillna(0.))
-    table4 = np.round(pos3.fillna(0.))
-    table5 = np.round(pos4.fillna(0.))
-    filename = plot_pnl([pnl, pnl2, pnl3, pnl4, pnl_idx])
+    filename = plot_pnl(pnls)
     mail = Email('wayne.cq@hotmail.com', ['wayne.cq@hotmail.com'], 'FTSE250 Stocks')
     mail.add_date(dt.today())
     mail.add_image(filename, 600, 400)
     mail.add_text('PnL Summary', bold=True)
     mail.add_table(table, width=700)
-    mail.add_text('A4 Positions')
-    mail.add_table(table2, width=400)
-    mail.add_text('A6 Positions')
-    mail.add_table(table3, width=400)
-    mail.add_text('B5 Positions')
-    mail.add_table(table4, width=400)
-    mail.add_text('B6 Positions')
-    mail.add_table(table5, width=400)
+    for i, x in enumerate(pos):
+        mail.add_text('%s Positions' % pnls[i].name)
+        table2 = np.round(x.fillna(0.))
+        mail.add_table(table2, width=400)
     mail.send_email()
 
 
