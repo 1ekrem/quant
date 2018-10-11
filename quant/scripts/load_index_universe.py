@@ -21,6 +21,12 @@ def load_ftse100_universe():
     stocks._save_tickers(data, 'FTSE100')
 
 
+def load_aim_universe():
+    logger.info('Loading AIM universe')
+    data = scrape.read_aim_stocks()
+    stocks._save_tickers(data, 'AIM')
+
+
 def main():
     load_smx_universe()
     load_ftse250_universe()

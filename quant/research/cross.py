@@ -44,41 +44,57 @@ def get_returns(r, max_rtn=.25):
     return rtn, rm, vol2
 
 
-def get_universe_returns(universe):
-    r = stocks.load_google_returns(data_table=stocks.UK_STOCKS)
+def get_volume(vol):
+    v = vol.resample('W').sum()
+    v = v.rolling(52, min_periods=13).median()
+    v[v <= 0.] = .5
+    ans = np.log(v)
+    ans = ans.subtract(ans.mean(axis=1), axis=0).divide(ans.std(axis=1), axis=0)
+    return ans
+
+
+def get_universe_returns(universe, data_name='Returns'):
+    r = stocks.load_google_returns(data_table=stocks.UK_STOCKS, data_name=data_name)
     if universe == 'SMX':
         u = stocks.get_ftse_smx_universe()
     elif universe == 'FTSE250':
         u = stocks.get_ftse250_universe()
+    elif universe == 'AIM':
+        u = stocks.get_ftse_aim_universe()
     r = r.loc[:, r.columns.isin(u.index)]
     return r
 
 
 def get_dataset(universe, max_rtn=None):
     r = get_universe_returns(universe)
+    volume = get_universe_returns(universe, data_name='Volume')
     if max_rtn is None:
-        if universe == 'SMX':
+        if universe in ['SMX', 'AIM']:
             max_rtn = .25
         else:
             max_rtn = .2
-    return get_returns(r, max_rtn=max_rtn)
+    r, rm, v = get_returns(r, max_rtn=max_rtn)
+    vol = get_volume(volume)
+    return r, rm, v, vol
 
 
 def get_stock_mom(rm, lookback=8):
     return rm.rolling(lookback, min_periods=1).mean() * np.sqrt(1. * lookback)
 
 
-def get_momentum_weights(rtn, rm, vol, stm=3):
+def get_momentum_weights(rtn, rm, vol, volume, stm=3):
     ans = []
     s1 = get_stock_mom(rm, stm)
     s2 = get_stock_mom(rm, 52).shift(stm)
-    acc = rm.cumsum()
-    ax = acc.rolling(stm, min_periods=1).min()
     acc2 = rtn.cumsum()
     dd = acc2.rolling(13, min_periods=1).max() - acc2
-    #ans = 1. * (s1 < -.5) * (s2 > .5) * (acc == ax).divide(vol)
-    ans = 1. * (s1 < -.5) * (s2 > .5).divide(vol)
-    ans = ans[ans > 0].ffill(limit=3)[dd >= .09]
+    ltm = get_stock_mom(rm, 52).shift(3)
+    wl = np.sign(ltm.subtract(ltm.mean(axis=1), axis=0)).divide(vol)
+    rl = rtn.mul(wl.shift())
+    z = rl.rolling(3, min_periods=1).mean()
+    z = z.subtract(z.mean(axis=1), axis=0).divide(z.std(axis=1), axis=0)
+    ans = 1. * (s1 <= -.5) * (s2 >= .5).divide(vol)
+    ans = ans[ans > 0].ffill(limit=3)[(volume >= -.6) & (dd >= .08) & (z <= .1)]
     ans2 = 1. * ~s1.isnull() * ~s2.isnull() * (ans.fillna(0.) == 0.).divide(vol)
     good = rtn.mul(ans.shift()).sum(axis=1) / ans.sum(axis=1).shift()
     bad = rtn.mul(ans2.shift()).sum(axis=1) / ans2.sum(axis=1).shift()
@@ -86,16 +102,18 @@ def get_momentum_weights(rtn, rm, vol, stm=3):
 
 
 def plot_momentum(universe='SMX'):
-    rtn, rm, vol = get_dataset(universe)
-    ans, good, bad = get_momentum_weights(rtn, rm, vol)
+    rtn, rm, vol, volume = get_dataset(universe)
+    ans, good, bad = get_momentum_weights(rtn, rm, vol, volume)
     plt.figure()
     good.cumsum().ffill().plot(label='Good')
     bad.cumsum().ffill().plot(label='Bad')
+    (good - bad).cumsum().ffill().plot(label='Diff')
     plt.legend(loc='best', frameon=False)
     plt.title(universe, weight='bold')
     plt.tight_layout()
-    #plt.savefig(PATH + '%s momentum.png' % universe)
-    #plt.close()
+    plt.savefig(PATH + '%s momentum.png' % universe)
+    plt.close()
+
 
 # blind factor identification
 def get_svd_loadings(rm):
@@ -104,211 +122,64 @@ def get_svd_loadings(rm):
     return pd.DataFrame(u, index=rm.columns).iloc[:, :len(s)]
 
 
-def get_emom_weight(u, rm, ltm):
-    r = []
-    x = sm.add_constant(u)
-    for idx in rm.index:
-        y = rm.loc[idx].fillna(0.)
-        lm = sm.OLS(y, x)
-        m = lm.fit()
-        tmp = m.params.iloc[1:]
-        tmp.name = idx
-        r.append(tmp)
-    r = pd.concat(r, axis=1).T
-    s = r.sum(axis=0)
-    s /= s.abs().sum()
-    u2 = u.mul(s, axis=1)
-    #s = rm[ltm.shift() < 0].sum(axis=0) - rm[ltm.shift() > 0].sum(axis=0)
-    #u3 = (u2 > 0).mul(s, axis=0).sum(axis=0)
-    #u3[u3 < 0] = 0.
-    return np.sign(u2.sum(axis=1))
+def get_factor_returns(u, rm):
+    ans = pd.DataFrame(np.dot(rm.fillna(0.), u), index=rm.index, columns=u.columns)
+    return ans.divide(np.diag(np.dot(u.T, u)), axis=1) 
 
 
-def get_emom(rtn, rm, vol):
+def get_emom_weight(u, rm):
+    r = get_factor_returns(u, rm)
+    f = r.mean(axis=0)
+    z = r.mean(axis=0) / r.std(axis=0) * np.sqrt(52.)
+    f = f * (z.abs() >= 2)
+    return u.mul(f, axis=1).sum(axis=1)
+
+
+def get_emom(rtn, rm, vol, volume):
     ans = []
-    ltm = get_stock_mom(rm, 52)
+    #w, _, _ = get_momentum_weights(rtn, rm, vol, volume)
     for i in xrange(52, len(rm)):
         idx = rm.index[i]
         logger.info(idx.strftime('Running %Y-%m-%d'))
         r = rm.iloc[i-52:i]
-        lm = ltm.iloc[i-52:i]
         u = get_svd_loadings(r)
-        w = get_emom_weight(u, r, lm)
-        w.name = idx
-        ans.append(w)
-    ans = pd.concat(ans, axis=1).T.divide(vol)[~rm.isnull()]
-    w, _, _ = get_momentum_weights(rtn, rm, vol)
+        tmp = get_emom_weight(u, r)
+        tmp.name = idx
+        ans.append(tmp)
+    ans = pd.concat(ans, axis=1).T
     p = w[ans > 0]
-    p2 = w[ans < 0]
-    #p = ans[ans > 0].ffill(limit=3)
-    #p2 = 1. * ~rm.isnull() * (p.fillna(0.) == 0.).divide(vol)
-    good = rtn.mul(p.shift()).sum(axis=1) / p.sum(axis=1).shift()
-    bad = rtn.mul(p2.shift()).sum(axis=1) / p2.sum(axis=1).shift()
-    return ans, good, bad
-
-
-def cache_blind_momentum(universe='SMX'):
-    filename = PATH + '%s_bmom.dat' % universe
-    rtn, rm, vol = get_dataset(universe)
-    write_pickle(get_blind_momentum(rtn, rm, vol), filename)
-
-
-def load_blind_momentum(universe='SMX'):
-    filename = PATH + '%s_bmom.dat' % universe
-    return load_pickle(filename)
-
-
-def calc_res_momentum(rm, u):
-    r = []
-    x = sm.add_constant(u)
-    for idx in rm.index:
-        y = rm.loc[idx].fillna(0.)
-        lm = sm.OLS(y, x)
-        m = lm.fit()
-        tmp = m.resid
-        tmp.name = idx
-        r.append(tmp)
-    r = pd.concat(r, axis=1).T[~rm.isnull()]
-    stm = r.iloc[-3:].mean(axis=0) * np.sqrt(3.)
-    ltm = r.iloc[:-3].mean(axis=0) * np.sqrt(len(r) - 3.)
-    stm.name = rm.index[-1]
-    ltm.name = rm.index[-1]
-    return stm, ltm
-
-
-def get_res_momentum(rtn, rm, vol, lookback=4, factors=10):
-    s1 = []
-    s2 = []
-    for i in xrange(52, len(rm)):
-        idx = rm.index[i]
-        logger.info(idx.strftime('Running %Y-%m-%d'))
-        r = rm.iloc[i-52:i]
-        u = get_svd_loadings(r)
-        s, l = calc_res_momentum(r, u.iloc[:, factors])
-        s1.append(s)
-        s2.append(l)
-    s1 = pd.concat(s1, axis=1).T
-    s2 = pd.concat(s2, axis=1).T
-    ans = 1. * (s1 < -.5) * (s2 > .5).divide(vol)
-    ans = ans[ans > 0].ffill(limit=lookback-1)
-    ans2 = 1. * ~s1.isnull() * ~s2.isnull() * (ans.fillna(0.) == 0.).divide(vol)
-    good = rtn.mul(ans.shift()).sum(axis=1) / ans.sum(axis=1).shift()
-    bad = rtn.mul(ans2.shift()).sum(axis=1) / ans2.sum(axis=1).shift()
-    return ans, good, bad
-
-        
-        
-def get_ltmom_weight(u, rm, lm, lookback=1):
-    ans = []
-    for i in xrange(len(u.columns)):
-        x = lm.mul(np.sign(u).iloc[:, i], axis=1)
-        g = lm[x > 0].shift(lookback)
-        good = rm.rolling(lookback, min_periods=1).sum().mul(g).sum(axis=1).divide(g.abs().sum(axis=1), axis=0)
-        b = lm[x < 0].shift(lookback)
-        bad = rm.rolling(lookback, min_periods=1).sum().mul(b).sum(axis=1).divide(b.abs().sum(axis=1), axis=0)
-        t = (good.mean() - bad.mean()) / np.sqrt(good.var() / len(good) + bad.var() / len(bad))
-        if np.abs(t) >= 2:
-            s = good.sum() - bad.sum()
-        else:
-            s = 0.
-        ans.append(s)
-    ans = np.array(ans)
-    if np.sum(np.abs(ans)) > 0:
-        ans /= np.sum(np.abs(ans))
-    return np.sign(u).mul(ans, axis=1).sum(axis=1)
-
-
-def get_long_weight(u, rm, sm, lookback=1):
-    ans = []
-    for i in xrange(len(u.columns)):
-        x = sm.mul(np.sign(u).iloc[:, i], axis=1)
-        g = sm[x < 0].shift(lookback)
-        good = rm.rolling(lookback, min_periods=1).sum().mul(g).sum(axis=1).divide(g.abs().sum(axis=1), axis=0)
-        b = sm[x > 0].shift(lookback)
-        bad = rm.rolling(lookback, min_periods=1).sum().mul(b).sum(axis=1).divide(b.abs().sum(axis=1), axis=0)
-        #t = (good.mean() - bad.mean()) / np.sqrt(good.var() / len(good) + bad.var() / len(bad))
-        #if np.abs(t) >= 2:
-        s = good.sum() - bad.sum()
-        #else:
-        #    s = 0.
-        ans.append(s)
-    ans = np.array(ans)
-    if np.sum(np.abs(ans)) > 0:
-        ans /= np.sum(np.abs(ans))
-    return np.sign(u).mul(ans, axis=1).sum(axis=1)
-
-
-def calc_momentum_weights(rtn, rm, vol, lookback=4):
-    ans = []
-    s1 = get_stock_mom(rm, 3)
-    s2 = get_stock_mom(rm, 52).shift(3)
-    ltm = 1. * (s1 < -1) * (s2 > -1).divide(vol)
-    for i in xrange(52, len(rm)):
-        idx = rm.index[i]
-        logger.info(idx.strftime('Running %Y-%m-%d'))
-        r = rm.iloc[i-52:i]
-        r2 = rtn.iloc[i-52:i]
-        u = get_svd_loadings(r)
-        w = get_long_weight(u, r2, ltm.iloc[i-52:i], lookback)
-        w.name = idx
-        ans.append(w)
-    ans = pd.concat(ans, axis=1).T
-    good = rtn.mul(ltm[ans > 0].shift()).sum(axis=1) / ltm[ans > 0].abs().sum(axis=1).shift()
-    bad = rtn.mul(ltm[ans < 0].shift()).sum(axis=1) / ltm[ans < 0].abs().sum(axis=1).shift()
-    return ans, good, bad
-
-
-def run_regression(y, x):
-    x = sm.add_constant(x.fillna(0.))
-    lm = sm.OLS(y.fillna(0.), x)
-    return lm.fit()
-
-      
-def get_neutral_returns(rm, stm):
-    ans = []
-    for idx in rm.index:
-        y = rm.loc[idx].dropna()
-        if not y.empty:
-            x = stm.loc[idx, y.index]
-            if (~x.isnull()).any():
-                m = run_regression(y, x)
-                tmp = m.resid
-                tmp.name = idx
-                ans.append(tmp)
-            else:
-                ans.append(y)
-    ans = pd.concat(ans, axis=1).T
-    return ans[~rm.isnull()]
+    p2 = w[ans < 0] 
+    good = rtn.mul(p.shift()).sum(axis=1) / p.abs().sum(axis=1).shift()
+    bad = rtn.mul(p2.shift()).sum(axis=1) / p2.abs().sum(axis=1).shift()
+    tot= rtn.mul(w.shift()).sum(axis=1) / w.abs().sum(axis=1).shift()
+    return ans, good, bad, tot
 
 
 def show_momentum(universe='SMX'):
-    rtn, rm, vol = get_dataset(universe)
-    acc = rtn.cumsum()
-    s = acc.rolling(13, min_periods=1).max() - acc
-    ans, _, _ = get_momentum_weights(rtn, rm, vol, 9)
+    rtn, rm, vol, volume = get_dataset(universe)
+    stm = 3
+    s1 = get_stock_mom(rm, stm)
+    s2 = get_stock_mom(rm, 52).shift(stm)
+    acc2 = rtn.cumsum()
+    dd = acc2.rolling(13, min_periods=1).max() - acc2
+    ltm = get_stock_mom(rm, 52).shift(3)
+    wl = np.sign(ltm.subtract(ltm.mean(axis=1), axis=0)).divide(vol)
+    rl = rtn.mul(wl.shift())
+    z = rl.rolling(3, min_periods=1).mean()
+    z = z.subtract(z.mean(axis=1), axis=0).divide(z.std(axis=1), axis=0)
+    ans = 1. * (s1 <= -.5) * (s2 >= .5).divide(vol)
+    ans = ans[ans > 0].ffill(limit=3)[(volume >= -.6) & (z <= .1) & (dd >= .08)]
+    #ans, _, _ = get_momentum_weights(rtn, rm, vol, volume, 3)
+
     y = pd.Series([])
-    for x in np.arange(.05, .15, .01):
-        p = ans[s >= x]
-        p2 = ans[s < x]
-        r = rtn.mul(p.shift()).sum(axis=1) / p.abs().sum(axis=1).shift()
-        r2 = rtn.mul(p2.shift()).sum(axis=1) / p2.abs().sum(axis=1).shift()
-        y.loc[x] = r.sum() - r2.sum()
+    for t in np.arange(.01, .15, .01):
+        p = ans[dd >= t]
+        p2 = ans[dd < t]
+        ra = rtn.mul(p.shift()).sum(axis=1) / p.abs().sum(axis=1).shift()
+        rb = rtn.mul(p2.shift()).sum(axis=1) / p2.abs().sum(axis=1).shift()
+        y.loc[t] = ra.sum() - rb.sum()
     return y
-    
-    x = .09
-    p = ans[s >= x]
-    p2 = ans[s < x]
-    r = rtn.mul(p.shift()).sum(axis=1) / p.abs().sum(axis=1).shift()
-    r2 = rtn.mul(p2.shift()).sum(axis=1) / p2.abs().sum(axis=1).shift()
-    r3 = rtn.mul(ans.shift()).sum(axis=1) / ans.abs().sum(axis=1).shift()
-    plt.figure()
-    r.cumsum().plot(label='A')
-    r2.cumsum().plot(label='B')
-    r3.cumsum().plot(label='Orig')
-    plt.legend(loc='best', frameon=False)
-    plt.title(universe, weight='bold')
-    plt.tight_layout()
-    plt.savefig(PATH + '%s momentum chart.png' % universe)
+
 
 
 def cache_momentum():

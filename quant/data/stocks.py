@@ -22,6 +22,7 @@ GLOBAL_ASSETS = 'global_assets'
 UK_STOCKS = 'uk_stocks'
 SMX_EXCLUDED = ['BGS']
 FTSE250_EXCLUDED = ['PIN', 'UKCM']
+AIM_EXCLUDED = []
 
 
 def create_google_table():
@@ -229,7 +230,9 @@ def import_uk_yahoo_prices(years=1, missing=False):
     start_date = end_date - relativedelta(years=years)
     u = get_ftse_smx_universe()
     u2 = get_ftse250_universe()
+    u3 = get_ftse_aim_universe()
     u = pd.concat([u, u2.loc[~u2.index.isin(u.index)]], axis=0, sort=False)
+    u = pd.concat([u, u3.loc[~u3.index.isin(u.index)]], axis=0, sort=False)
     if missing:
         r = load_google_returns(dt.today() - relativedelta(days=5), dt.today(), data_table=UK_STOCKS)
         r = r.iloc[-1].loc[u.index]
@@ -257,6 +260,12 @@ def get_ftse_smx_universe():
 def get_ftse250_universe():
     ans = get_universe('FTSE250')
     return ans.loc[~ans.index.isin(FTSE250_EXCLUDED)]
+
+
+def get_ftse_aim_universe():
+    ans = get_universe('AIM')
+    return ans.loc[~ans.index.isin(AIM_EXCLUDED)]
+
 
 
 def load_google_returns(start_date=None, end_date=None, data_name='Returns', data_table=GLOBAL_ASSETS):

@@ -51,7 +51,11 @@ def get_hl_stocks_table(url):
     soup = get_page(url)
     pages = find_hl_pages(soup)
     ans = []
-    if pages is not None:
+    if pages is None:
+        ss = get_page(url)
+        tmp = find_hl_stock_names(ss)
+        ans.append(tmp)
+    else:
         for p in xrange(pages):
             new_url = url + '?page=%d' % (p+1)
             ss = get_page(new_url)
@@ -65,7 +69,8 @@ def get_hl_stocks_table(url):
         for kw in ['FUND', 'TRUST', 'REIT', 'INVEST', 'INV TST', 'FIDELITY', 'ABERDEEN', 'BH ', 'HENDERSON',
                    'JPMORGAN', 'ALPHA', 'BAILLIE GIFFORD', 'CREDIT', 'REAL ESTATE', 'EQUITY', 'GBP',
                    'CAPITAL', 'INFRASTRUCTURE', 'SYNCONA', 'F&C', 'INTERNATIONAL PUBLIC PARTNERSHIPS',
-                   'PERSHING SQUARE', 'MARKETS', 'JUPITER', 'PHOENIX SPREE', 'PICTON']:
+                   'PERSHING SQUARE', 'MARKETS', 'JUPITER', 'PHOENIX SPREE', 'PICTON', 'JOHN LAING', 'SICAV',
+                   'RIVERSTONE', 'GREENCOAT']:
             ans = ans.loc[~ans.u.str.contains(kw)]
         return ans.Name
     else:
@@ -85,4 +90,10 @@ def read_ftse250_stocks():
 def read_ftse100_stocks():
     url = "https://www.hl.co.uk/shares/stock-market-summary/ftse-100"
     return get_hl_stocks_table(url)
+
+
+def read_aim_stocks():
+    url = "https://www.hl.co.uk/shares/stock-market-summary/ftse-aim-100"
+    return get_hl_stocks_table(url)
+
 

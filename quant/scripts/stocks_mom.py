@@ -19,35 +19,34 @@ def get_a_signal(r, rm, i=3):
     '''
     s1 = cross.get_stock_mom(rm, i)
     s2 = cross.get_stock_mom(rm, 52).shift(i)
-    #acc = r.cumsum().ffill()
-    #ax = acc.rolling(i, min_periods=1).min()
-    sig = 1. * (s1 < -.5) * (s2 > .5)# * (acc == ax)
+    sig = 1. * (s1 < -.5) * (s2 > .5)
     return sig[sig > 0]
 
 
 def get_smx_data():
-    u = stocks.get_ftse_smx_universe()
-    r = stocks.load_google_returns(data_name='Returns', data_table=stocks.UK_STOCKS)
-    r = r.loc[:, r.columns.isin(u.index)]
-    rtn, rm, vol = cross.get_returns(r)
-    return rtn, rm, vol
+    return cross.get_dataset('SMX')
 
 
 def get_ftse250_data():
-    u = stocks.get_ftse250_universe()
-    r = stocks.load_google_returns(data_name='Returns', data_table=stocks.UK_STOCKS)
-    r = r.loc[:, r.columns.isin(u.index)]
-    rtn, rm, vol = cross.get_returns(r)
-    return rtn, rm, vol
+    return cross.get_dataset('FTSE250')
 
 
-def get_a_bundle(r, rm, posvol, capital, i):
+def get_aim_data():
+    return cross.get_dataset('AIM')
+
+
+def get_a_bundle(r, rm, posvol, volume, capital, i):
     pos = get_a_signal(r, rm, i)
     v = pos.sum(axis=1).mean()
     sig_date = pos.index[-1]
     acc = r.cumsum()
     dd = acc.rolling(13, min_periods=1).max() - acc
-    pos = (1. / posvol)[pos > 0].ffill(limit=3)[dd >= .09]
+    ltm = get_stock_mom(rm, 52).shift(3)
+    wl = np.sign(ltm.subtract(ltm.mean(axis=1), axis=0)).divide(vol)
+    rl = rtn.mul(wl.shift())
+    z = rl.rolling(3, min_periods=1).mean()
+    z = z.subtract(z.mean(axis=1), axis=0).divide(z.std(axis=1), axis=0)
+    pos = (1. / posvol)[pos > 0].ffill(limit=3)[(dd >= .08) & (volume >= -.6) & (z <= .1)]
     pnl = r.mul(pos.shift())
     pnl_idx = r.mul(1. / posvol.shift())
     p1 = pd.concat([pos.iloc[-1], pnl.iloc[-1]], axis=1) * capital
@@ -60,11 +59,11 @@ def get_a_bundle(r, rm, posvol, capital, i):
     return sig_date, p1, pnl, pnl_idx
     
     
-def run_package(r, rm, posvol, capital=500):
+def run_package(r, rm, posvol, volume, capital=500):
     pos = []
     pnls = []
     for i in [3, 6, 9]:
-        sig_date, p1, pnl, pnl_idx = get_a_bundle(r, rm, posvol, capital, i)
+        sig_date, p1, pnl, pnl_idx = get_a_bundle(r, rm, posvol, volume, capital, i)
         pos.append(p1)
         pnls.append(pnl)
     pnls.append(pnl_idx)

@@ -20,10 +20,10 @@ def get_reversal_table(rm):
     
 
 def run_check():
-    rtn, rm, vol = cross.get_dataset('SMX')
+    rtn, rm, vol, _ = cross.get_dataset('SMX')
     table = get_week_table(rtn)
     table2 = get_reversal_table(rm)
-    rtn, rm, vol = cross.get_dataset('FTSE250')
+    rtn, rm, vol, _ = cross.get_dataset('FTSE250')
     table3 = get_week_table(rtn)
     table4 = get_reversal_table(rm)
     mail = Email('wayne.cq@hotmail.com', ['wayne.cq@hotmail.com'], 'Market Watch')
