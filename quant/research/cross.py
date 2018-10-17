@@ -86,6 +86,7 @@ def get_momentum_weights(rtn, rm, vol, volume, stm=3):
     ans = []
     s1 = get_stock_mom(rm, stm)
     s2 = get_stock_mom(rm, 52).shift(stm)
+    s3 = get_stock_mom(rm, 52)
     acc2 = rtn.cumsum()
     dd = acc2.rolling(13, min_periods=1).max() - acc2
     ltm = get_stock_mom(rm, 52).shift(3)
@@ -94,7 +95,7 @@ def get_momentum_weights(rtn, rm, vol, volume, stm=3):
     z = rl.rolling(3, min_periods=1).mean()
     z = z.subtract(z.mean(axis=1), axis=0).divide(z.std(axis=1), axis=0)
     ans = 1. * (s1 <= -.5) * (s2 >= .5).divide(vol)
-    ans = ans[ans > 0].ffill(limit=3)[(volume >= -.6) & (dd >= .08) & (z <= .1)]
+    ans = ans[ans > 0].ffill(limit=3)[(volume >= -.6) & (dd >= .08) & (z <= .1) & (s3 >= 0) & (s1 <= 0)]
     ans2 = 1. * ~s1.isnull() * ~s2.isnull() * (ans.fillna(0.) == 0.).divide(vol)
     good = rtn.mul(ans.shift()).sum(axis=1) / ans.sum(axis=1).shift()
     bad = rtn.mul(ans2.shift()).sum(axis=1) / ans2.sum(axis=1).shift()
@@ -160,6 +161,8 @@ def show_momentum(universe='SMX'):
     stm = 3
     s1 = get_stock_mom(rm, stm)
     s2 = get_stock_mom(rm, 52).shift(stm)
+    s3 = get_stock_mom(rm, 52)
+    
     acc2 = rtn.cumsum()
     dd = acc2.rolling(13, min_periods=1).max() - acc2
     ltm = get_stock_mom(rm, 52).shift(3)
@@ -167,18 +170,38 @@ def show_momentum(universe='SMX'):
     rl = rtn.mul(wl.shift())
     z = rl.rolling(3, min_periods=1).mean()
     z = z.subtract(z.mean(axis=1), axis=0).divide(z.std(axis=1), axis=0)
+    
     ans = 1. * (s1 <= -.5) * (s2 >= .5).divide(vol)
-    ans = ans[ans > 0].ffill(limit=3)[(volume >= -.6) & (z <= .1) & (dd >= .08)]
-    #ans, _, _ = get_momentum_weights(rtn, rm, vol, volume, 3)
+    ans = ans[ans > 0].ffill(limit=3)[(volume >= -.6) & (dd >= .08) & (s3 >=0) & (s1 <=0)]
+
+#     p = ans[ch > 0]
+#     p2 = ans[ch <= 0]
+#     plt.figure()
+#     ra = rtn.mul(p.shift()).sum(axis=1) / p.abs().sum(axis=1).shift()
+#     ra = ra.fillna(0.)
+#     ra.cumsum().plot(label='A')
+#     rb = rtn.mul(p2.shift()).sum(axis=1) / p2.abs().sum(axis=1).shift()
+#     rb = rb.fillna(0.)
+#     rb.cumsum().plot(label='B')
+#     (ra - rb).cumsum().plot(label='Diff')
+#     plt.legend(loc='best', frameon=False)
+#     return None
 
     y = pd.Series([])
-    for t in np.arange(.01, .15, .01):
-        p = ans[dd >= t]
-        p2 = ans[dd < t]
+    for t in np.arange(-.5, .6, .1):
+        p = ans[z <= t]
+        p2 = ans[z > t]
+        #plt.figure()
         ra = rtn.mul(p.shift()).sum(axis=1) / p.abs().sum(axis=1).shift()
+        ra = ra.fillna(0.)
+        #ra.cumsum().plot(label='A')
         rb = rtn.mul(p2.shift()).sum(axis=1) / p2.abs().sum(axis=1).shift()
+        rb = rb.fillna(0.)
+        #rb.cumsum().plot(label='B')
         y.loc[t] = ra.sum() - rb.sum()
     return y
+    
+    
 
 
 

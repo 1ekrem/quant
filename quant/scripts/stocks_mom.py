@@ -41,12 +41,14 @@ def get_a_bundle(r, rm, posvol, volume, capital, i):
     sig_date = pos.index[-1]
     acc = r.cumsum()
     dd = acc.rolling(13, min_periods=1).max() - acc
-    ltm = get_stock_mom(rm, 52).shift(3)
-    wl = np.sign(ltm.subtract(ltm.mean(axis=1), axis=0)).divide(vol)
-    rl = rtn.mul(wl.shift())
+    ltm = cross.get_stock_mom(rm, 52).shift(3)
+    wl = np.sign(ltm.subtract(ltm.mean(axis=1), axis=0)).divide(posvol)
+    rl = r.mul(wl.shift())
     z = rl.rolling(3, min_periods=1).mean()
     z = z.subtract(z.mean(axis=1), axis=0).divide(z.std(axis=1), axis=0)
-    pos = (1. / posvol)[pos > 0].ffill(limit=3)[(dd >= .08) & (volume >= -.6) & (z <= .1)]
+    s1 = cross.get_stock_mom(rm, i)
+    s3 = cross.get_stock_mom(rm, 52)
+    pos = (1. / posvol)[pos > 0].ffill(limit=3)[(dd >= .08) & (volume >= -.6) & (z <= .1) & (s1 <=0) & (s3 >= 0)]
     pnl = r.mul(pos.shift())
     pnl_idx = r.mul(1. / posvol.shift())
     p1 = pd.concat([pos.iloc[-1], pnl.iloc[-1]], axis=1) * capital
