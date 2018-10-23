@@ -20,6 +20,7 @@ DATABASE_NAME = 'quant'
 STOCKS_DESCRIPTION = 'stocks_description'
 GLOBAL_ASSETS = 'global_assets'
 UK_STOCKS = 'uk_stocks'
+UK_FINANCIALS = 'uk_financials'
 SMX_EXCLUDED = ['BGS']
 FTSE250_EXCLUDED = ['PIN', 'UKCM']
 AIM_EXCLUDED = []
@@ -28,6 +29,7 @@ AIM_EXCLUDED = []
 def create_google_table():
     du.create_t2_timeseries_table(DATABASE_NAME, GLOBAL_ASSETS)
     du.create_t2_timeseries_table(DATABASE_NAME, UK_STOCKS)
+    du.create_t2_timeseries_table(DATABASE_NAME, UK_FINANCIALS)
 
 
 # Tickers
@@ -267,12 +269,15 @@ def get_ftse_aim_universe():
     return ans.loc[~ans.index.isin(AIM_EXCLUDED)]
 
 
-
 def load_google_returns(start_date=None, end_date=None, data_name='Returns', data_table=GLOBAL_ASSETS):
     if start_date is None and end_date is None:
         return tu.get_timeseries(DATABASE_NAME, data_table, data_name=data_name)
     else:
         return tu.get_timeseries(DATABASE_NAME, data_table, index_range=(start_date, end_date), data_name=data_name)
+
+
+def load_financial_data(data_name='revenue', data_table=UK_FINANCIALS):
+    return tu.get_timeseries(DATABASE_NAME, data_table, data_name=data_name)
 
 
 def create_universe():
