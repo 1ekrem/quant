@@ -6,9 +6,9 @@ from quant.scripts import proactive, investegate
 
 def load_proactive_for_ticker(ticker, database=stocks.DATABASE_NAME, table_name=stocks.UK_FINANCIALS):
     logger.info('Loading %s' % ticker)
-    url = proactive.get_proactive_url(ticker)
-    if url is not None:
-        soup = proactive.get_proactive_finantials_page(url)
+    t, c = proactive.get_proactive_url_name(ticker)
+    if t is not None:
+        soup = proactive.get_proactive_finantials_page(t, c)
         data = proactive.get_proactive_financial_data(soup)
         for k, v in data.iteritems():
             if v is not None:

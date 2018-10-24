@@ -13,6 +13,11 @@ def get_table_content(x, by='tr'):
     return [d.text.replace('\n', '') for d in x.find_all(by)]
 
 
+def check_page_content(soup):
+    tmp = soup.find_all('table')
+    return len(tmp) > 0
+
+
 def get_merge_table(soup):
     t = soup.find_all('table')
     contents = [get_table_content(x) for x in t]
@@ -50,8 +55,14 @@ def _to_data(s):
 def load_investegate_contents(ticker):
     ans = None
     ans2 = None
+    soup = get_investegate_finalcials_page(ticker, None)
+    if check_page_content(soup):
+        ticker_to_use = ticker
+    else:
+        ticker_to_use = ticker + '.'
+        logger.info('Trying ticker %s' % ticker_to_use)
     for page in [None, 8, 16]:
-        soup = get_investegate_finalcials_page(ticker, page)
+        soup = get_investegate_finalcials_page(ticker_to_use, page)
         if soup is not None:
             a, a2 = get_merge_table(soup)
             if ans is None:
@@ -64,7 +75,7 @@ def load_investegate_contents(ticker):
                 ans2 = pd.concat([a2[a2.index < ans2.index[0]], ans2], axis=0)
     data = {}
     if ans is not None and ans2 is not None:
-        for t in ['Turnover', 'Operating Profit', 'EPS Diluted']:
+        for t in ['Turnover', 'Operating Profit', 'Pretax Profit', 'EPS Diluted']:
             for c in ans.columns:
                 if t in c:
                     tmp = _to_data(ans.loc[:, c])

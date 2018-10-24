@@ -153,6 +153,15 @@ def get_emom(rtn, rm, vol, volume):
     return ans, good.fillna(0.), bad.fillna(0.), tot
 
 
+def load_fundamental_changes(data_type):
+    data = stocks.load_financial_data(data_type)
+    if data is None:
+        return None
+    else:
+        data = data.resample('M').last()
+        return tu.get_calendar_df(data)
+
+
 def show_momentum(universe='SMX'):
     rtn, rm, vol, volume = get_dataset(universe)
     stm = 3
@@ -185,16 +194,19 @@ def show_momentum(universe='SMX'):
 
     y = pd.Series([])
     financials = {}
-    ids = ['revenue', 'eps', 'ebitda', 'fcf']
+    ids = ['Turnover', #'Pretax Profit', 'Operating Profit', 'EPS Diluted',
+           'revenue']#, 'eps', 'ebitda', 'fcf']
     for t in ids:
-        data = stocks.load_financial_data(t)
-        data = data.loc[:, rtn.columns].resample('M').last()
-        ch = tu.get_calendar_df(data)
-        sd = ch.std(axis=0)
-        z = ch.divide(sd, axis=1).ffill()
+        ch = load_fundamental_changes(t)
+        ch2 = load_fundamental_changes('Interim ' + t)
+        if ch2 is not None:
+            ch = ch.add(2. * ch2, fill_value=0.)
+        ch = ch.loc[:, rtn.columns]
+        sd = ch.abs().ewm(span = 3*12).mean()
+        z = (ch / sd).ffill()
         mu = z.mean(axis=1)
         z = z.subtract(mu, axis=0)
-        financials[t] = z.shift(3)
+        financials[t] = ch.ffill().shift()
     a = None
     for v in financials.values():
         if a is None:
@@ -204,14 +216,14 @@ def show_momentum(universe='SMX'):
     financials['All'] = a
     for k, v in financials.iteritems():
         s = tu.resample(v, ans).fillna(0.)
-        p = ans[s >= 0]
+        p = ans[s > 0]
         p2 = ans
         #plt.figure()
         ra = rtn.mul(p.shift()).sum(axis=1) / p.abs().sum(axis=1).shift()
-        ra = ra.fillna(0.)
+        ra = ra.fillna(0.)[dt(2012, 1, 1):]
         rb = rtn.mul(p2.shift()).sum(axis=1) / p2.abs().sum(axis=1).shift()
-        rb = rb.fillna(0.)
-        (ra - rb)[dt(2012,1,1):].cumsum().plot(label=k)
+        rb = rb.fillna(0.)[dt(2012, 1, 1):]
+        (ra - rb).cumsum().plot(label=k)
         #rb.cumsum().plot(label='B')
         y.loc[k] = ra.sum() - rb.sum()
     plt.legend(loc='best', frameon=False)
