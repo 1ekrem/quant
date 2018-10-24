@@ -71,6 +71,21 @@ def ts_interpolate(series):
     return data
 
 
+def _to_calendar_df(x):
+    b = x.dropna()
+    if b.empty:
+        return x
+    else:
+        return b.diff().loc[x.index]
+
+
+def get_calendar_df(data):
+    if isinstance(data, pd.Series):
+        return _to_calendar_df(data)
+    else:
+        return data.apply(_to_calendar_df, axis=0)
+
+
 def store_timeseries(ts, database_name, table_name, data_name=None):
     du.pandas_bulk_insert(ts, database_name, table_name, du.TIMESERIES_COLUMN_NAME, du.TIMESERIES_INDEX_NAME,
                           du.TIMESERIES_VALUE_NAME, data_name, du.TIMESERIES_DATA_NAME)

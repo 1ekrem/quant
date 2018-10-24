@@ -1,5 +1,4 @@
 from quant.lib.main_utils import *
-import sys
 from quant.data import stocks
 
 

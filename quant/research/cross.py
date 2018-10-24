@@ -156,7 +156,7 @@ def get_emom(rtn, rm, vol, volume):
 def show_momentum(universe='SMX'):
     rtn, rm, vol, volume = get_dataset(universe)
     stm = 3
-    s1 = get_stock_mom(rm, stm).shift()
+    s1 = get_stock_mom(rm, stm)
     s2 = get_stock_mom(rm, 52).shift(stm)
     s3 = get_stock_mom(rm, 52)
     
@@ -170,34 +170,51 @@ def show_momentum(universe='SMX'):
     
     ans = 1. * (s1 <= -.5) * (s2 >= .5).divide(vol)
     ans = ans[ans > 0].ffill(limit=3)[(volume >= -.6) & (dd >= .08) & (s1 <= 0) & (s3 >= 0) & (z<=.1)].fillna(0.)
-    p = ans
-    p2= 1. * ~s1.isnull() * ~s2.isnull() * (ans.fillna(0.) == 0.).divide(vol)
-    #plt.figure()
-    ra = rtn.mul(p.shift()).sum(axis=1) / p.abs().sum(axis=1).shift()
-    ra = ra.fillna(0.)
-    ra.cumsum().plot(label='A')
+#     p = ans
+#     p2= 1. * ~s1.isnull() * ~s2.isnull() * (ans.fillna(0.) == 0.).divide(vol)
+#     plt.figure()
+#     ra = rtn.mul(p.shift()).sum(axis=1) / p.abs().sum(axis=1).shift()
+#     ra = ra.fillna(0.)
+#     ra.cumsum().plot(label='A')
 #     rb = rtn.mul(p2.shift()).sum(axis=1) / p2.abs().sum(axis=1).shift()
 #     rb = rb.fillna(0.)
 #     rb.cumsum().plot(label='B')
 #     (ra - rb).cumsum().plot(label='Diff')
 #     plt.legend(loc='best', frameon=False)
-    return None
+#     return None
 
     y = pd.Series([])
-    for t in np.arange(0., 1.01, .1):
-        ans = 1. * (s1 <= t) * (s2 >= t).divide(vol)
-        p = ans[ans > 0].ffill(limit=3)[(volume >= -.6) & (dd >= .08) & (s0 <= 0) & (s3 >= 0) & (z<=.1)].fillna(0.)
-    
-        #p = ans[s1 <= t]
-        #p2 = ans[s1 > t]
+    financials = {}
+    ids = ['revenue', 'eps', 'ebitda', 'fcf']
+    for t in ids:
+        data = stocks.load_financial_data(t)
+        data = data.loc[:, rtn.columns].resample('M').last()
+        ch = tu.get_calendar_df(data)
+        sd = ch.std(axis=0)
+        z = ch.divide(sd, axis=1).ffill()
+        mu = z.mean(axis=1)
+        z = z.subtract(mu, axis=0)
+        financials[t] = z.shift(3)
+    a = None
+    for v in financials.values():
+        if a is None:
+            a = v
+        else:
+            a = a.add(v, fill_value=0.)
+    financials['All'] = a
+    for k, v in financials.iteritems():
+        s = tu.resample(v, ans).fillna(0.)
+        p = ans[s >= 0]
+        p2 = ans
         #plt.figure()
         ra = rtn.mul(p.shift()).sum(axis=1) / p.abs().sum(axis=1).shift()
         ra = ra.fillna(0.)
-        #ra.cumsum().plot(label='A')
-        #rb = rtn.mul(p2.shift()).sum(axis=1) / p2.abs().sum(axis=1).shift()
-        #rb = rb.fillna(0.)
+        rb = rtn.mul(p2.shift()).sum(axis=1) / p2.abs().sum(axis=1).shift()
+        rb = rb.fillna(0.)
+        (ra - rb)[dt(2012,1,1):].cumsum().plot(label=k)
         #rb.cumsum().plot(label='B')
-        y.loc[t] = ra.sum() #- rb.sum()
+        y.loc[k] = ra.sum() - rb.sum()
+    plt.legend(loc='best', frameon=False)
     return y
     
     

@@ -18,4 +18,3 @@ def get_page(url):
 
 def google(question, max_page=20):
     return search(question, stop=max_page)
-
