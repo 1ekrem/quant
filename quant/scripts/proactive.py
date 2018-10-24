@@ -6,12 +6,14 @@ URL = 'https://www.proactiveinvestors.co.uk/%s/%s/financials/'
 
 
 def get_proactive_url_name(symbol):
-    txt = 'LON:%s proactiveinvestor financials' % symbol
+    txt = 'LON:%s proactiveinvestor' % symbol
+    c0 = 'LON:%s/' % symbol
+    c1 = 'LON:%s./' % symbol
     res = google(txt)
     ticker = None
     comp_name = None
     for x in res:
-        if PROACTIVE in x and symbol in x:
+        if PROACTIVE in x and (c0 in x or c1 in x) and '%20' not in x and 'shares' in x:
             s = x.split('/')
             for i in xrange(len(s) - 1):
                 if 'LON:' in s[i]:
