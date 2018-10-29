@@ -78,12 +78,14 @@ def load_investegate_contents(ticker):
         for t in ['Turnover', 'Operating Profit', 'Pretax Profit', 'EPS Diluted']:
             for c in ans.columns:
                 if t in c:
-                    tmp = _to_data(ans.loc[:, c])
-                    tmp.name = ticker
-                    data[t] = tmp
+                    tmp = _to_data(ans.loc[:, c]).dropna()
+                    if not tmp.empty:
+                        tmp.name = ticker
+                        data[t] = tmp
             for c in ans2.columns:
                 if t in c:
-                    tmp = _to_data(ans2.loc[:, c])
-                    tmp.name = ticker
-                    data['Interim ' + t] =  tmp
+                    tmp = _to_data(ans2.loc[:, c]).dropna()
+                    if not tmp.empty:
+                        tmp.name = ticker
+                        data['Interim ' + t] =  tmp
     return data

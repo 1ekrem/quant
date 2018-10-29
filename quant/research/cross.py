@@ -15,7 +15,7 @@ def get_top(x, top=5):
         if y.empty:
             return v
         else:
-            return y.sort_values(ascending=False).iloc[:top].loc[v.index]
+            return y.sort_values(ascending=False).iloc[:top].reindex(v.index)
     
     return x.apply(_get_top, axis=1)
 
@@ -55,12 +55,7 @@ def get_volume(vol):
 
 def get_universe_returns(universe, data_name='Returns'):
     r = stocks.load_google_returns(data_table=stocks.UK_STOCKS, data_name=data_name)
-    if universe == 'SMX':
-        u = stocks.get_ftse_smx_universe()
-    elif universe == 'FTSE250':
-        u = stocks.get_ftse250_universe()
-    elif universe == 'AIM':
-        u = stocks.get_ftse_aim_universe()
+    u = stocks.load_universe(universe)
     r = r.loc[:, r.columns.isin(u.index)]
     return r
 
@@ -82,7 +77,20 @@ def get_stock_mom(rm, lookback=8):
     return rm.rolling(lookback, min_periods=1).mean() * np.sqrt(1. * lookback)
 
 
-def get_momentum_weights(rtn, rm, vol, volume, stm=3):
+def get_step_positions(input1, input2, vol, ns, f=None, f2=None, holding=3):
+    s1 = input1 if f is None else input1[f > 0]
+    s2 = input2 if f is None else input2[f > 0]
+    fast = get_top(s1, ns * 2)
+    p = get_top(s2[~fast.isnull()], ns)
+    ans = (1. / vol)[~p.isnull()]
+    if holding > 0:
+        ans = ans.ffill(limit=holding)
+    if f2 is not None:
+        ans = ans[f2 > 0]
+    return ans
+
+
+def get_old_momentum_weights(rtn, rm, vol, volume, stm=3):
     ans = []
     s1 = get_stock_mom(rm, stm)
     s2 = get_stock_mom(rm, 52).shift(stm)
@@ -102,6 +110,35 @@ def get_momentum_weights(rtn, rm, vol, volume, stm=3):
     return ans, good, bad
 
 
+def get_fast_weights(rtn, rm, vol, volume, stm=3, ns=5, holding=0):
+    s1 = -1. * get_stock_mom(rm, stm)
+    s2 = get_stock_mom(rm, 52).shift(stm)
+    s3 = get_stock_mom(rm, 52)
+    acc2 = rtn.cumsum()
+    dd = acc2.rolling(13, min_periods=1).max() - acc2
+    base = 1. * (volume >= -.6) * (dd >= .08) * (s1 >= 1.6) * (s3 >= -.4)
+    ans = get_step_positions(s1, s2, vol, ns, base, holding=holding)
+    ans2 = 1. * ~s1.isnull() * ~s2.isnull() * (ans.fillna(0.) == 0.).divide(vol)
+    good = rtn.mul(ans.shift()).sum(axis=1) / ans.sum(axis=1).shift()
+    bad = rtn.mul(ans2.shift()).sum(axis=1) / ans2.sum(axis=1).shift()
+    return ans, good, bad
+
+
+def get_slow_weights(rtn, rm, vol, volume, stm=7, ns=9, holding=3):
+    s1 = -1. * get_stock_mom(rm, stm)
+    s2 = get_stock_mom(rm, 52).shift(stm)
+    s3 = get_stock_mom(rm, 52)
+    acc2 = rtn.cumsum()
+    dd = acc2.rolling(13, min_periods=1).max() - acc2
+    base = 1. * (volume >= -.6)
+    base2 = 1. * (s1 >= 1.) * (s3 >= .4)
+    ans = get_step_positions(s2, s1, vol, ns, base, base2, holding=holding)
+    ans2 = 1. * ~s1.isnull() * ~s2.isnull() * (ans.fillna(0.) == 0.).divide(vol)
+    good = rtn.mul(ans.shift()).sum(axis=1) / ans.sum(axis=1).shift()
+    bad = rtn.mul(ans2.shift()).sum(axis=1) / ans2.sum(axis=1).shift()
+    return ans, good, bad
+
+
 def plot_momentum(universe='SMX'):
     rtn, rm, vol, volume = get_dataset(universe)
     ans, good, bad = get_momentum_weights(rtn, rm, vol, volume)
@@ -114,7 +151,6 @@ def plot_momentum(universe='SMX'):
     plt.tight_layout()
     plt.savefig(PATH + '%s momentum.png' % universe)
     plt.close()
-
 
 # blind factor identification
 def get_svd_loadings(rm):
@@ -153,84 +189,160 @@ def get_emom(rtn, rm, vol, volume):
     return ans, good.fillna(0.), bad.fillna(0.), tot
 
 
-def load_fundamental_changes(data_type):
+def _change_score(x):
+    y = x.dropna()
+    if y.empty:
+        return x
+    else:
+        speed = 7
+        vol = y.abs().ewm(span=speed).mean()
+        vol[vol <= 0.] = 1.
+        mu = y.ewm(span=speed).mean()
+        return y.subtract(mu).divide(vol).reindex(x.index)
+
+
+def get_change_score(data):
+    return data.apply(_change_score, axis=0)
+
+
+def load_fundamental_changes(data_type, u):
     data = stocks.load_financial_data(data_type)
     if data is None:
         return None
     else:
+        data = data.reindex(u.index, axis=1)
+        today = dt.today()
+        if today not in data.index:
+            data.loc[today] = np.nan
         data = data.resample('M').last()
         return tu.get_calendar_df(data)
+    
+
+def load_financials(universe='SMX'):
+    financials = {}
+    ids = ['Turnover', 'Pretax Profit', 'Operating Profit', 'EPS Diluted',
+           'revenue', 'profit', 'ebit', 'eps', 'ebitda', 'fcf']
+    u = stocks.load_universe(universe)
+    for x in ids:
+        data = load_fundamental_changes(x, u)
+        data2 = load_fundamental_changes('Interim ' + x, u)
+        if data2 is not None:
+            data = data.add(2. * data2, fill_value=0.)
+        z = get_change_score(data).ffill()
+        #mu = z.mean(axis=1)
+        #sd = z.std(axis=1)
+        financials[x] = z.shift()
+    return financials
+    
+    
+def get_portfolio_returns(ans, rtn):
+    ra = rtn.mul(ans.shift()).sum(axis=1) / ans.abs().sum(axis=1).shift()
+    return ra.fillna(0.)
 
 
-def show_momentum(universe='SMX'):
+def cs(data, speed):
+    def _cs(x):
+        y = x.dropna()
+        if y.empty:
+            return x
+        else:
+            vol = y.abs().ewm(span=speed).mean()
+            vol[vol <= 0.] = 1.
+            mu = y.ewm(span=speed).mean()
+            return y.subtract(mu).divide(vol).reindex(x.index)
+    return data.apply(_cs, axis=0)
+
+
+def test_momentum(universe='SMX'):
     rtn, rm, vol, volume = get_dataset(universe)
-    stm = 3
-    s1 = get_stock_mom(rm, stm)
+    stm = 8
+    ltm = 52
+    ns = 10
+    s1 = -1. * get_stock_mom(rm, stm)
     s2 = get_stock_mom(rm, 52).shift(stm)
     s3 = get_stock_mom(rm, 52)
-    
     acc2 = rtn.cumsum()
     dd = acc2.rolling(13, min_periods=1).max() - acc2
-    ltm = get_stock_mom(rm, 52).shift(3)
-    wl = np.sign(ltm.subtract(ltm.mean(axis=1), axis=0)).divide(vol)
-    rl = rtn.mul(wl.shift())
-    z = rl.rolling(3, min_periods=1).mean()
-    z = z.subtract(z.mean(axis=1), axis=0).divide(z.std(axis=1), axis=0)
-    
-    ans = 1. * (s1 <= -.5) * (s2 >= .5).divide(vol)
-    ans = ans[ans > 0].ffill(limit=3)[(volume >= -.6) & (dd >= .08) & (s1 <= 0) & (s3 >= 0) & (z<=.1)].fillna(0.)
-#     p = ans
-#     p2= 1. * ~s1.isnull() * ~s2.isnull() * (ans.fillna(0.) == 0.).divide(vol)
-#     plt.figure()
-#     ra = rtn.mul(p.shift()).sum(axis=1) / p.abs().sum(axis=1).shift()
-#     ra = ra.fillna(0.)
-#     ra.cumsum().plot(label='A')
-#     rb = rtn.mul(p2.shift()).sum(axis=1) / p2.abs().sum(axis=1).shift()
-#     rb = rb.fillna(0.)
-#     rb.cumsum().plot(label='B')
-#     (ra - rb).cumsum().plot(label='Diff')
-#     plt.legend(loc='best', frameon=False)
-#     return None
+    base = 1. * (volume >= -.6) #* (s1 >= 1.6) * (s3 >= -.4) * (dd >= .08)
+    base2 = 1. * (s1 >= 0.5)# * (s3 >= .4)
 
-    y = pd.Series([])
-    financials = {}
-    ids = ['Turnover', #'Pretax Profit', 'Operating Profit', 'EPS Diluted',
-           'revenue']#, 'eps', 'ebitda', 'fcf']
-    for t in ids:
-        ch = load_fundamental_changes(t)
-        ch2 = load_fundamental_changes('Interim ' + t)
-        if ch2 is not None:
-            ch = ch.add(2. * ch2, fill_value=0.)
-        ch = ch.loc[:, rtn.columns]
-        sd = ch.abs().ewm(span = 3*12).mean()
-        z = (ch / sd).ffill()
-        mu = z.mean(axis=1)
-        z = z.subtract(mu, axis=0)
-        financials[t] = ch.ffill().shift()
-    a = None
-    for v in financials.values():
-        if a is None:
-            a = v
-        else:
-            a = a.add(v, fill_value=0.)
-    financials['All'] = a
+    financials = load_financials(universe)
+    y = pd.DataFrame([])
+    z = pd.DataFrame([])
+    c = pd.DataFrame([])
+    #x = np.arange(0, .15, .01)
+    ans = get_step_positions(s1, s2, vol, ns, base, base2)
+    ans2 = get_step_positions(s2, s1, vol, ns, base, base2)
+    ra = get_portfolio_returns(ans, rtn)
+    rb = get_portfolio_returns(ans2, rtn)
+    y.loc['orig', 'Fast'] = ra.sum()
+    y.loc['orig', 'Slow'] = rb.sum()
+    z.loc['orig', 'Fast'] = ra[dt(2012, 1, 1):].sum()
+    z.loc['orig', 'Slow'] = rb[dt(2012, 1, 1):].sum()
+    c.loc['orig', 'Fast'] = (ans > 0)[dt(2012, 1, 1):].sum(axis=1).mean()
+    c.loc['orig', 'Slow'] = (ans2 > 0)[dt(2012, 1, 1):].sum(axis=1).mean()
+    rb[dt(2012, 1, 1):].cumsum().plot(label='orig')
     for k, v in financials.iteritems():
-        s = tu.resample(v, ans).fillna(0.)
-        p = ans[s > 0]
-        p2 = ans
-        #plt.figure()
-        ra = rtn.mul(p.shift()).sum(axis=1) / p.abs().sum(axis=1).shift()
-        ra = ra.fillna(0.)[dt(2012, 1, 1):]
-        rb = rtn.mul(p2.shift()).sum(axis=1) / p2.abs().sum(axis=1).shift()
-        rb = rb.fillna(0.)[dt(2012, 1, 1):]
-        (ra - rb).cumsum().plot(label=k)
-        #rb.cumsum().plot(label='B')
-        y.loc[k] = ra.sum() - rb.sum()
-    plt.legend(loc='best', frameon=False)
-    return y
-    
-    
+        x = tu.resample(v, rtn)
+        #f = 1. * (x <= 0) * (s2 >= 0) * (base > 0)
+        ans = get_step_positions(s1, x, vol, ns, base, base2)
+        ans2 = get_step_positions(s2, x, vol, ns, base, base2)
+        ra = get_portfolio_returns(ans, rtn)
+        rb = get_portfolio_returns(ans2, rtn)
+        y.loc[k, 'Fast'] = ra.sum()
+        y.loc[k, 'Slow'] = rb.sum()
+        z.loc[k, 'Fast'] = ra[dt(2012, 1, 1):].sum()
+        z.loc[k, 'Slow'] = rb[dt(2012, 1, 1):].sum()
+        c.loc[k, 'Fast'] = (ans > 0)[dt(2012, 1, 1):].sum(axis=1).mean()
+        c.loc[k, 'Slow'] = (ans2 > 0)[dt(2012, 1, 1):].sum(axis=1).mean()
+        rb[dt(2012, 1, 1):].cumsum().plot(label=k)
+    return y, z, c
 
+    u = stocks.load_universe(universe)
+    data = load_fundamental_changes('Turnover', u)
+    data2 = load_fundamental_changes('Interim ' + 'Turnover', u)
+    if data2 is not None:
+        data = data.add(2. * data2, fill_value=0.)
+    data = tu.resample(cs(data, 7).ffill().shift(), rtn)
+
+    y = pd.DataFrame([])
+    z = pd.DataFrame([])
+    c = pd.DataFrame([])
+    x = np.arange(0., 2., .1)
+    for k in x:
+        #s1 = -1. * get_stock_mom(rm, k)
+        #s2 = get_stock_mom(rm, 52).shift(k)
+        f = 1. * (s1 >= k)
+        ans = get_step_positions(s1, data, vol, ns, base, f)
+        ans2 = get_step_positions(s2, data, vol, ns, base, f)
+        ra = get_portfolio_returns(ans, rtn)
+        rb = get_portfolio_returns(ans2, rtn)
+        y.loc[k, 'Fast'] = ra.sum()
+        y.loc[k, 'Slow'] = rb.sum()
+        z.loc[k, 'Fast'] = ra[dt(2012, 1, 1):].sum()
+        z.loc[k, 'Slow'] = rb[dt(2012, 1, 1):].sum()
+        c.loc[k, 'Fast'] = (ans > 0)[dt(2012, 1, 1):].sum(axis=1).mean()
+        c.loc[k, 'Slow'] = (ans2 > 0)[dt(2012, 1, 1):].sum(axis=1).mean()
+    return y, z, c
+    
+    ans = get_step_positions(s1, s2, vol, ns, base, base2)
+    ans2 = get_step_positions(s2, s1, vol, ns, base, base2)
+    #ans3 = get_step_positions(s1, s2, vol, ns, base, f)
+    #ans4 = get_step_positions(s2, s1, vol, ns, base, f)
+
+    ra = get_portfolio_returns(ans, rtn)
+    rb = get_portfolio_returns(ans2, rtn)
+    #rc = get_portfolio_returns(ans3, rtn)
+    #rd = get_portfolio_returns(ans4, rtn)
+    
+    plt.figure()
+    ra.cumsum().plot(label='fast')
+    rb.cumsum().plot(label='slow')
+    #rc.cumsum().plot(label='fast new')
+    #rd.cumsum().plot(label='slow new')
+    
+    plt.legend(loc='best', frameon=False)
+    
 
 
 def cache_momentum():

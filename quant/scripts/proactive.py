@@ -13,7 +13,8 @@ def get_proactive_url_name(symbol):
     ticker = None
     comp_name = None
     for x in res:
-        if PROACTIVE in x and (c0 in x or c1 in x) and '%20' not in x and 'shares' in x:
+        if PROACTIVE in x and (c0 in x or c1 in x) and 'shares' in x and \
+            '%20' not in x and c0 + 'shares' not in x and c1 + 'shares' not in x:
             s = x.split('/')
             for i in xrange(len(s) - 1):
                 if 'LON:' in s[i]:

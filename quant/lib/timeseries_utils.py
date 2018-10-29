@@ -86,6 +86,22 @@ def get_calendar_df(data):
         return data.apply(_to_calendar_df, axis=0)
 
 
+def _to_calendar_pct(x):
+    b = x.dropna()
+    if b.empty:
+        return x
+    else:
+        base = pd.concat([b.abs(), b.shift().abs()], axis=1).max(axis=1)
+        base[base <= 0.] = 1.
+        return b.diff().divide(base).loc[x.index]
+
+
+def get_calendar_pct(data):
+    if isinstance(data, pd.Series):
+        return _to_calendar_pct(data)
+    else:
+        return data.apply(_to_calendar_pct, axis=0)
+
 def store_timeseries(ts, database_name, table_name, data_name=None):
     du.pandas_bulk_insert(ts, database_name, table_name, du.TIMESERIES_COLUMN_NAME, du.TIMESERIES_INDEX_NAME,
                           du.TIMESERIES_VALUE_NAME, data_name, du.TIMESERIES_DATA_NAME)

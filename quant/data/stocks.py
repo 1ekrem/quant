@@ -23,6 +23,7 @@ UK_STOCKS = 'uk_stocks'
 UK_FINANCIALS = 'uk_financials'
 SMX_EXCLUDED = ['BGS']
 FTSE250_EXCLUDED = ['PIN', 'UKCM']
+FTSE100_EXCLUDED = []
 AIM_EXCLUDED = []
 
 
@@ -264,9 +265,26 @@ def get_ftse250_universe():
     return ans.loc[~ans.index.isin(FTSE250_EXCLUDED)]
 
 
+def get_ftse100_universe():
+    ans = get_universe('FTSE100')
+    return ans.loc[~ans.index.isin(FTSE100_EXCLUDED)]
+
+
 def get_ftse_aim_universe():
     ans = get_universe('AIM')
     return ans.loc[~ans.index.isin(AIM_EXCLUDED)]
+
+
+def load_universe(universe):
+    if universe == 'SMX':
+        u = get_ftse_smx_universe()
+    elif universe == 'FTSE250':
+        u = get_ftse250_universe()
+    elif universe == 'AIM':
+        u = get_ftse_aim_universe()
+    elif universe == 'FTSE100':
+        u = get_ftse100_universe()
+    return u
 
 
 def load_google_returns(start_date=None, end_date=None, data_name='Returns', data_table=GLOBAL_ASSETS):

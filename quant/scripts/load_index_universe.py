@@ -31,6 +31,7 @@ def main():
     load_smx_universe()
     load_ftse250_universe()
     load_ftse100_universe()
+    load_aim_universe()
 
 
 if __name__ == '__main__':
