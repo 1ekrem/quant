@@ -14,7 +14,7 @@ from matplotlib import pyplot as plt
 from datetime import datetime as dt
 from quant.scripts import stocks_mom as sm
 from quant.strategies import smx
-from quant.lib import visualization_utils as vu
+from quant.lib import timeseries_utils as tu, visualization_utils as vu
 from quant.lib.main_utils import Email
 
 
@@ -37,7 +37,9 @@ def plot_pnl(pnls):
 
 def run_smx_check(capital=200):
     r, rm, posvol, volume = sm.get_smx_data()
-    sig_date, pos, pnls = sm.run_package(r, rm, posvol, volume, capital)
+    f = sm.get_fundamentals('SMX')
+    score = tu.resample(f, r)
+    sig_date, pos, pnls = sm.run_package(r, rm, posvol, volume, score, capital)
     table = np.round(100. * pd.concat(pnls, axis=1).iloc[-6:], 2)
     table.columns = [x + ' (%)' for x in table.columns]
     table.index = [x.strftime('%Y-%m-%d') for x in table.index]
@@ -56,7 +58,9 @@ def run_smx_check(capital=200):
 
 def run_ftse250_check(capital=200):
     r, rm, posvol, volume = sm.get_ftse250_data()
-    sig_date, pos, pnls = sm.run_package(r, rm, posvol, volume, capital)
+    f = sm.get_fundamentals('FTSE250')
+    score = tu.resample(f, r)
+    sig_date, pos, pnls = sm.run_package(r, rm, posvol, volume, score, capital)
     table = np.round(100. * pd.concat(pnls, axis=1).iloc[-6:], 2)
     table.columns = [x + ' (%)' for x in table.columns]
     table.index = [x.strftime('%Y-%m-%d') for x in table.index]

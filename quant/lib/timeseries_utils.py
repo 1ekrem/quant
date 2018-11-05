@@ -76,7 +76,7 @@ def _to_calendar_df(x):
     if b.empty:
         return x
     else:
-        return b.diff().loc[x.index]
+        return b.diff().reindex(x.index)
 
 
 def get_calendar_df(data):

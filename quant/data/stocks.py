@@ -231,11 +231,7 @@ def import_uk_google_prices(period='1Y'):
 def import_uk_yahoo_prices(years=1, missing=False):
     end_date = dt.today()
     start_date = end_date - relativedelta(years=years)
-    u = get_ftse_smx_universe()
-    u2 = get_ftse250_universe()
-    u3 = get_ftse_aim_universe()
-    u = pd.concat([u, u2.loc[~u2.index.isin(u.index)]], axis=0, sort=False)
-    u = pd.concat([u, u3.loc[~u3.index.isin(u.index)]], axis=0, sort=False)
+    u = load_uk_universe()
     if missing:
         r = load_google_returns(dt.today() - relativedelta(days=5), dt.today(), data_table=UK_STOCKS)
         r = r.iloc[-1].loc[u.index]
@@ -284,6 +280,17 @@ def load_universe(universe):
         u = get_ftse_aim_universe()
     elif universe == 'FTSE100':
         u = get_ftse100_universe()
+    return u
+
+
+def load_uk_universe():
+    u = stocks.get_ftse_smx_universe()
+    u2 = stocks.get_ftse250_universe()
+    u3 = stocks.get_ftse_aim_universe()
+    u4 = stocks.get_ftse100_universe()
+    u = pd.concat([u, u2.loc[~u2.index.isin(u.index)]], axis=0, sort=False)
+    u = pd.concat([u, u3.loc[~u3.index.isin(u.index)]], axis=0, sort=False)
+    u = pd.concat([u, u4.loc[~u3.index.isin(u.index)]], axis=0, sort=False)
     return u
 
 
