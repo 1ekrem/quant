@@ -6,6 +6,7 @@ Created on 22 Jun 2017
 import logging
 import os
 import sys
+import time
 import smtplib
 import cPickle as pickle
 import pandas as pd
@@ -51,12 +52,6 @@ def load_pickle(filename):
     return ans
 
 
-try:
-    EMAILADDRESS, EMAILPASSWORD = load_pickle('/home/wayne/quant.dat')
-except:
-    logger.info('Environment variable not loaded')
-
-
 def write_pickle(data, filename):
     try:
         with open(filename, 'wb') as f:
@@ -64,6 +59,37 @@ def write_pickle(data, filename):
             f.close()
     except Exception as e:
         logger.warn('Failed to write pickle %s:\n%s' % (filename, str(e)))
+
+
+try:
+    EMAILADDRESS, EMAILPASSWORD = load_pickle('/home/wayne/quant.dat')
+except:
+    logger.info('Environment variable not loaded')
+
+
+def try_once(func):
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except:
+            logger.warn('Failed for %s' % str(*args))
+            return None
+    return wrapper
+
+
+def try_again(func):
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except:
+            logger.info('Wait 10 seconds and try again...')
+            time.sleep(10)
+            try:
+                return func(*args, **kwargs)
+            except:
+                logger.warn('Failed for %s' % str(*args))
+                return None
+    return wrapper
 
 
 def get_timeline(start_date, end_date):

@@ -284,10 +284,10 @@ def load_universe(universe):
 
 
 def load_uk_universe():
-    u = stocks.get_ftse_smx_universe()
-    u2 = stocks.get_ftse250_universe()
-    u3 = stocks.get_ftse_aim_universe()
-    u4 = stocks.get_ftse100_universe()
+    u = get_ftse_smx_universe()
+    u2 = get_ftse250_universe()
+    u3 = get_ftse_aim_universe()
+    u4 = get_ftse100_universe()
     u = pd.concat([u, u2.loc[~u2.index.isin(u.index)]], axis=0, sort=False)
     u = pd.concat([u, u3.loc[~u3.index.isin(u.index)]], axis=0, sort=False)
     u = pd.concat([u, u4.loc[~u3.index.isin(u.index)]], axis=0, sort=False)

@@ -158,7 +158,7 @@ def get_fast_fundamental_weights(rtn, rm, vol, volume, score, stm=3, ns=3, holdi
     return ans, good, bad
 
 
-def get_slow_weights(rtn, rm, vol, volume, stm=4, ns=11, holding=3):
+def get_slow_weights(rtn, rm, vol, volume, stm=4, ns=12, holding=3):
     s1 = -1. * get_stock_mom(rm, stm)
     s2 = get_stock_mom(rm, 52).shift(stm)
     s3 = get_stock_mom(rm, 52)
@@ -236,82 +236,32 @@ def get_emom(rtn, rm, vol, volume):
     return ans, good.fillna(0.), bad.fillna(0.), tot
 
 
-def _change_score(x):
-    y = x.dropna()
-    if y.empty:
-        return x
-    else:
-        speed = 2
-        vol = y.abs().ewm(span=speed).mean()
-        vol[vol <= 0.] = 1.
-        #mu = y.ewm(span=speed).mean()
-        #return y.subtract(mu).divide(vol).reindex(x.index)
-        return y.divide(vol).reindex(x.index)
-
-
-def get_change_score(data):
-    return data.apply(_change_score, axis=0)
-
-
-
-    
 def get_portfolio_returns(ans, rtn):
     ra = rtn.mul(ans.shift()).sum(axis=1) / ans.abs().sum(axis=1).shift()
     return ra.fillna(0.)
 
 
-def cs(data, speed):
-    def _cs(x):
-        y = x.dropna()
-        if y.empty:
-            return x
-        else:
-            vol = y.abs().ewm(span=speed).mean()
-            vol[vol <= 0.] = np.nan
-            #z = y.divide(vol.shift())
-            #z[z.isnull()] = np.sign(y[z.isnull()])
-            #z.loc[:] = 2. * (ss.norm.cdf(z.values, 0., 1.) - .5)
-            return y.divide(vol).reindex(x.index)
-    return data.apply(_cs, axis=0)
-
-
-def run_regression(y, x):
-    data = pd.concat([y, x], axis=1).dropna()
-    if data.empty:
-        return None
-    else:
-        xx = sm.add_constant(data.iloc[:, 1])
-        yy = data.iloc[:, 0]
-        m = sm.OLS(yy, xx).fit()
-        return m.params.loc[data.columns[1]]
-
-
-def show_fundamental_returns(universe='SMX'):
-    ans = pd.DataFrame([])
+def show_portfolio_size(universe='SMX'):
     rtn, rm, vol, volume = get_dataset(universe)
-    
-    u = stocks.load_universe(universe)
-    data = load_fundamental_changes('EPS Diluted', u)
-    data2 = load_fundamental_changes('Interim ' + 'EPS Diluted', u)
-    if data2 is not None:
-        data = data.add(2. * data2, fill_value=0.)
-    data = cs(data, 2)
-    
-    for i in xrange(1, 13):
-        d = tu.resample(data.ffill(limit=i).shift(), rtn)
-        mu = d.mean(axis=1)
-        sd = d.std(axis=1)
-        sd[sd <= 0] = np.nan
-        d = d.subtract(mu, axis=0).divide(sd, axis=0)
-        d[d > 4.] = 4.
-        d[d < -4.] = -4.
-        for idx in rtn.index:
-            x = run_regression(rtn.loc[idx], d.loc[idx])
-            if x is not None:
-                ans.loc[idx, i] = x
-    ans.cumsum().plot()
-    plt.legend(loc='best', frameon=False)
-    return ans
+    data = load_financials(universe)
+    data = tu.resample(get_financials_overall_score(data), rtn)
+    ans = pd.DataFrame([])
+    ans2 = pd.DataFrame([])
+    for s in np.arange(1, 21):
+        _, g, _ = get_fast_weights(rtn, rm, vol, volume, ns=s)
+        _, g2, _ = get_fast_fundamental_weights(rtn, rm, vol, volume, data, ns=s)
+        _, g3, _ = get_slow_weights(rtn, rm, vol, volume, ns=s)
+        _, g4, _ = get_slow_fundamental_weights(rtn, rm, vol, volume, data, ns=s)
+        ans.loc[s, 'Fast'] = g.sum()
+        ans.loc[s, 'Fast F'] = g2.sum()
+        ans.loc[s, 'Slow'] = g3.sum()
+        ans.loc[s, 'Slow F'] = g4.sum()
+        ans2.loc[s, 'Fast'] = g[dt(2014,1,1):].sum()
+        ans2.loc[s, 'Fast F'] = g2[dt(2014,1,1):].sum()
+        ans2.loc[s, 'Slow'] = g3[dt(2014,1,1):].sum()
+        ans2.loc[s, 'Slow F'] = g4[dt(2014,1,1):].sum()
+    return ans, ans2
+        
 
 
 def test_momentum(universe='SMX'):

@@ -40,7 +40,7 @@ def get_fast_fundamental_signal(rtn, rm, vol, volume, score, stm=3, ns=3):
     return ans
 
 
-def get_slow_signal(rtn, rm, vol, volume, stm=4, ns=11):
+def get_slow_signal(rtn, rm, vol, volume, stm=4, ns=12):
     '''
     1st Gen slow signal
     '''
