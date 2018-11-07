@@ -77,6 +77,19 @@ def try_once(func):
     return wrapper
 
 
+def try_and_check(func):
+    def wrapper(*args, **kwargs):
+        try:
+            x = func(*args, **kwargs)
+            if x is None:
+                logger.info('No results for %s' % str(*args))
+            return x
+        except:
+            logger.warn('Failed for %s' % str(*args))
+            return None
+    return wrapper
+
+
 def try_again(func):
     def wrapper(*args, **kwargs):
         try:

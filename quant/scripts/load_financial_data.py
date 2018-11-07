@@ -39,24 +39,47 @@ def load_investegate_financials():
         load_investegate_for_ticker(ticker)
 
 
-@try_again
-def load_lse_bid_ask_spread(ticker):
-    return lse.load_bid_ask_spread(ticker)
+@try_and_check
+def load_lse_id(ticker):
+    return lse.get_company_code(ticker)
+
+
+def load_lse_ids(missing=False):
+    u = stocks.load_uk_universe()
+    if 'LSE' not in u.columns:
+        u.loc[:, 'LSE'] = np.nan
+    if missing:
+        existing = stocks.get_universe('LSE')
+        u = u.loc[~u.index.isin(existing.index)]
+    ans = pd.Series([])
+    for ticker in u.index:
+        logger.info('Loading %s' % ticker)
+        tmp = load_lse_id(ticker)
+        if tmp is not None:
+            ans.loc[ticker] = tmp
+    ans.name = 'LSE'
+    stocks._save_tickers(ans, 'LSE')
+
+
+@try_and_check
+def load_lse_bid_ask_spread(code):
+    return lse.load_bid_ask_spread(code)
 
 
 def load_bid_ask_spreads():
-    u = stocks.load_uk_universe()
+    u = stocks.get_universe('LSE')
     today = dt.today()
     today = dt(today.year, today.month, today.day)
     ans = pd.Series([])
     for ticker in u.index:
         logger.info('Loading %s' % ticker)
-        tmp = lse.load_bid_ask_spread(ticker)
+        tmp = load_lse_bid_ask_spread(u.loc[ticker, 'LSE'])
         if tmp is not None:
             ans.loc[ticker] = tmp
     ans = ans.to_frame().T
     ans.index = [today]
     tu.store_timeseries(ans, stocks.DATABASE_NAME, stocks.UK_STOCKS, 'Spread')
+
 
 
 def main():
@@ -67,6 +90,8 @@ def main():
         load_proactive_financials()
     elif target == 'Investegate':
         load_investegate_financials()
+    elif target == 'LSE':
+        load_lse_ids()
     elif target == 'Spread':
         load_bid_ask_spreads()
 

@@ -1,10 +1,11 @@
 from quant.lib.main_utils import *
 from quant.lib.web_utils import *
+import code
 
 LSE_PRICE = 'https://www.londonstockexchange.com/exchange/prices-and-markets/stocks/summary/company-summary/%s.html'
 
 
-def get_company_code(url):
+def get_company_code_from_url(url):
     ans = None
     if '/company-summary/' in url:
         tmp = url.split('/company-summary/')[-1]
@@ -14,29 +15,30 @@ def get_company_code(url):
     return ans
 
 
-def get_price_key(symbol):
-    c0 = 'London stock exchange'
+def get_price_page(code):
+    url = LSE_PRICE % code
+    return get_page(url)
+
+
+def check_price_page(soup, symbol):
+    check = '(%s' % symbol
+    return check in soup.title.text
+
+
+def get_company_code(symbol):
     c1 = 'www.londonstockexchange.com'
-    txt = '%s share price (%s)' % (c0, symbol)
-    res = google(txt)
-    url = []
+    txt = '%s share price %s' % (c1, symbol)
+    res = run_google_search(txt)
+    ans = None
     for x in res:
         if c1 in x:
-            tmp = get_company_code(x)
-            if tmp is not None:
-                url.append(tmp)
-    url = list(set(url))
-    return url
-
-
-def get_price_page(codes, symbol):
-    ans = None
-    for u in codes:
-        url = LSE_PRICE % u
-        soup = get_page(url)
-        if symbol in soup.text:
-            ans = soup
-            break
+            code = get_company_code_from_url(x)
+            if code is not None:
+                soup = get_price_page(code)
+                check = check_price_page(soup, symbol)
+                if check:
+                    ans = code
+                    break
     return ans
 
 
@@ -63,9 +65,8 @@ def get_bid_ask_spread(soup):
     return spread
 
 
-def load_bid_ask_spread(symbol):
-    codes = get_price_key(symbol)
-    soup = get_price_page(codes, symbol)
+def load_bid_ask_spread(code):
+    soup = get_price_page(code)
     if soup is not None:
         return get_bid_ask_spread(soup)
     else:
