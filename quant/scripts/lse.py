@@ -27,7 +27,7 @@ def check_price_page(soup, symbol):
 
 def get_company_code(symbol):
     c1 = 'www.londonstockexchange.com'
-    txt = '%s share price %s' % (c1, symbol)
+    txt = '%s site:%s' % (symbol, c1)
     res = run_google_search(txt)
     ans = None
     for x in res:

@@ -9,7 +9,7 @@ HEADERS.update({
     'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:62.0) Gecko/20100101 Firefox/62.0'
 })
 GOOGLEURL = 'https://www.google.com/search?client=ubuntu&channel=fs&q=%s&ie=utf-8&oe=utf-8&start=%d'
-GOOGLEREPLACE = {'%3F': '?', '%3D': '='}
+GOOGLEREPLACE = {'%3F': '?', '%3D': '=', '%3A': ':'}
 
 
 def get_page(url):
@@ -24,7 +24,7 @@ def google(question, max_page=20, pause=2):
 
 class GoogleSearch(object):
     def __init__(self, question, pages=1):
-        self.question = question.replace(' ', '+')
+        self.question = question.replace(' ', '+').replace(':', '%3A')
         self.pages = pages
         self.run()
     

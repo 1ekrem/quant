@@ -39,7 +39,7 @@ def run_smx_check(capital=200):
     r, rm, posvol, volume = sm.get_smx_data()
     f = sm.get_fundamentals('SMX')
     score = tu.resample(f, r)
-    sig_date, pos, pnls = sm.run_package(r, rm, posvol, volume, score, capital)
+    sig_date, pos, pnls = sm.run_package(r, rm, posvol, score, capital)
     table = np.round(100. * pd.concat(pnls, axis=1).iloc[-6:], 2)
     table.columns = [x + ' (%)' for x in table.columns]
     table.index = [x.strftime('%Y-%m-%d') for x in table.index]

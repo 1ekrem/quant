@@ -46,8 +46,6 @@ def read_tickers_file(filename):
 
 def _save_tickers(data, universe):
     if data is not None:
-        du.pandas_delete(DATABASE_NAME, STOCKS_DESCRIPTION, du.DESCRIPTION_COLUMN_NAME, du.DESCRIPTION_INDEX_NAME,
-                         du.DESCRIPTION_VALUE_NAME, data_name=universe)
         data.name = universe
         tu.store_description(data, DATABASE_NAME, STOCKS_DESCRIPTION)
 
@@ -234,7 +232,7 @@ def import_uk_yahoo_prices(years=1, missing=False):
     u = load_uk_universe()
     if missing:
         r = load_google_returns(dt.today() - relativedelta(days=5), dt.today(), data_table=UK_STOCKS)
-        r = r.iloc[-1].loc[u.index]
+        r = r.iloc[-1].reindex(u.index)
         u = u.loc[r.isnull()]
     i = 0
     for idx in u.index:

@@ -52,11 +52,34 @@ def load_lse_ids(missing=False):
         existing = stocks.get_universe('LSE')
         u = u.loc[~u.index.isin(existing.index)]
     ans = pd.Series([])
+    i = 0
     for ticker in u.index:
         logger.info('Loading %s' % ticker)
         tmp = load_lse_id(ticker)
-        if tmp is not None:
+        if tmp is None:
+            i += 1
+        else:
+            i = 0
             ans.loc[ticker] = tmp
+        if i >= 5:
+            break
+    if not ans.empty:
+        ans.name = 'LSE'
+        stocks._save_tickers(ans, 'LSE')
+
+
+def update_lse_ids():
+    ans = pd.Series([])
+    ans.loc['ASAI'] = 'GB00BDFXHW57GBGBXSSMM'
+    ans.loc['RWI'] = 'GB0007995243GBGBXSSMM'
+    ans.loc['HWDN'] = 'GB0005576813GBGBXSTMM'
+    ans.loc['INCH'] = 'GB00B61TVQ02GBGBXSTMM'
+    ans.loc['NEX'] = 'GB0006215205GBGBXSTMM'
+    ans.loc['VCT'] = 'GB0009292243GBGBXSTMM'
+    ans.loc['VVO'] = 'GB00BDGT2M75GBGBXSTMM'
+    ans.loc['BRK'] = 'GB00B067N833GBGBXAMSM'
+    ans.loc['CTH'] = 'GB00B0KWHQ09GBGBXAMSM'
+    ans.loc['PAM'] = 'GB00BZB2KR63GBGBXAMSM'
     ans.name = 'LSE'
     stocks._save_tickers(ans, 'LSE')
 
