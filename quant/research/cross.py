@@ -59,10 +59,9 @@ def get_spread(s):
 
 
 def get_universe_returns(universe, data_name='Returns'):
-    r = stocks.load_google_returns(data_table=stocks.UK_STOCKS, data_name=data_name)
     u = stocks.load_universe(universe)
-    r = r.loc[:, r.columns.isin(u.index)]
-    return r
+    r = stocks.load_google_returns(data_table=stocks.UK_STOCKS, data_name=data_name, tickers=u.index)
+    return r.reindex(u.index, axis=1)
 
 
 def get_dataset(universe, max_rtn=None, max_spread=None):
@@ -85,7 +84,7 @@ def get_dataset(universe, max_rtn=None, max_spread=None):
 
 
 def load_fundamental_changes(data_type, u):
-    data = stocks.load_financial_data(data_type)
+    data = stocks.load_financial_data(data_type, u.index)
     if data is None:
         return None
     else:
@@ -184,7 +183,7 @@ def get_portfolio_returns(ans, rtn):
 
 
 class Momentum(object):
-    def __init__(self, universe, max_spread=.025, min_stocks=2.5):
+    def __init__(self, universe, max_spread=.02, min_stocks=3.):
         self.universe = universe
         self.max_spread = max_spread
         self.min_stocks = min_stocks
@@ -193,6 +192,7 @@ class Momentum(object):
     def run(self):
         logger.info('Running momentum on %s' % self.universe)
         self.load_dataset()
+        self.run_all()
     
     def load_dataset(self):
         logger.info('Loading returns')
@@ -204,11 +204,12 @@ class Momentum(object):
         data = get_financials_overall_score(self.financials)
         self.score = tu.resample(data, self.rtn).reindex(self.rtn.columns, axis=1)
     
-    def run_sim(self, stm=3, ns=10, min_fast=0., min_slow=0., min_dd=None, fast=True, fundamental=False):
+    def run_sim(self, stm=3, ns=10, min_fast=0., min_slow=0., min_dd=None,
+                fast=True, fundamental=False):
         s1 = -1. * get_stock_mom(self.rm, stm)
         s2 = get_stock_mom(self.rm, 52).shift(stm)
         s3 = get_stock_mom(self.rm, 52)
-        holding = 0 if fast else 3
+        holding = 0
         input1 = s1 if fast else s2
         if fundamental:
             input2 = self.score
@@ -217,7 +218,7 @@ class Momentum(object):
         f = 1. * (s1 >= min_fast) * (s3 >= min_slow)
         if min_dd is not None:
             f = f * (self.dd >= min_dd)
-        ans = get_step_positions(input1, input2, self.vol, ns, None, f, holding=holding)
+        ans = get_step_positions(input1, input2, self.vol, ns, f, None, holding=holding)
         ra = get_portfolio_returns(ans, self.rtn)
         return ans, ra
     
@@ -249,7 +250,7 @@ class Momentum(object):
         
     def get_stm_set(self, base):
         ans = []
-        x = np.arange(2, 14)
+        x = np.arange(3, 14)
         for i, k in enumerate(x):
             msg = 'stm: %d .. %.1f%%' % (k, 100. * (i + 1) / len(x))
             new = base.copy()
@@ -269,7 +270,7 @@ class Momentum(object):
     
     def get_fast_set(self, base):
         ans = []
-        x = np.arange(-.5, 2.1, .1)
+        x = np.arange(-.5, 1.51, .1)
         for i, k in enumerate(x):
             msg = 'fast: %.1f .. %.1f%%' % (k, 100. * (i + 1) / len(x))
             new = base.copy()
@@ -286,7 +287,7 @@ class Momentum(object):
             new['min_slow'] = k
             ans.append((k, msg, new))
         return ans
-    
+
     def get_drawdown_set(self, base):
         ans = []
         x = np.arange(0., .16, .01)
@@ -311,23 +312,17 @@ class Momentum(object):
     
     def run_test(self, base):
 
-        logger.info('Testing slow')
-        set4 = self.get_slow_set(base)
-        a4 = self.run_pass(set4)
-        min_slow = self.decide(a4)
-        base['min_slow'] = min_slow
-
-        logger.info('Testing stm')
-        set1 = self.get_stm_set(base)
-        a1 = self.run_pass(set1)
-        stm = self.decide(a1)
-        base['stm'] = stm
-
         logger.info('Testing fast')
         set2 = self.get_fast_set(base)
         a2 = self.run_pass(set2)
         min_fast = self.decide(a2)
         base['min_fast'] = min_fast
+
+        logger.info('Testing slow')
+        set4 = self.get_slow_set(base)
+        a4 = self.run_pass(set4)
+        min_slow = self.decide(a4)
+        base['min_slow'] = min_slow
 
         logger.info('Testing ns')
         set3 = self.get_stocks_set(base)
@@ -335,7 +330,7 @@ class Momentum(object):
         ns = self.decide(a3)
         base['ns'] = ns
 
-        return base, a2.loc[min_fast]
+        return base, a3.loc[ns]
 
     def run_fast(self):
         base = self.get_fast()
@@ -362,24 +357,24 @@ class Momentum(object):
         self.results = ans
     
     def patch_results(self):
-        self.results = {'Fast': [{'fast': False, 'fundamental': True,
-                                              'min_fast': 1.7, 'min_slow': -0.1,
-                                              'ns': 14, 'stm': 3}],
-                        'Fast Fundamental': [{'fast': False, 'fundamental': True,
-                                              'min_fast': 1.4, 'min_slow': -0.4,
-                                              'ns': 20, 'stm': 3}],
-                        'Slow': [{'fast': False, 'fundamental': True,
-                                              'min_fast': 1.6, 'min_slow': -0.1,
-                                              'ns': 11, 'stm': 3}],
+        self.results = {'Fast': [{'fast': True, 'fundamental': False,
+                                              'min_fast': 1.5, 'min_slow': -.1,
+                                              'ns': 4, 'stm': 3}],
+                        'Fast Fundamental': [{'fast': True, 'fundamental': True,
+                                              'min_fast': 1.5, 'min_slow': -.1,
+                                              'ns': 4, 'stm': 3}],
+                        'Slow': [{'fast': False, 'fundamental': False,
+                                              'min_fast': 1.5, 'min_slow': -.1,
+                                              'ns': 4, 'stm': 3}],
                         'Slow Fundamental': [{'fast': False, 'fundamental': True,
-                                              'min_fast': 1.1, 'min_slow': -0.5,
-                                              'ns': 10, 'stm': 4}]}
+                                              'min_fast': 1.5, 'min_slow': -.1,
+                                              'ns': 4, 'stm': 3}]}
 
     def plot_simulations(self):
         plt.figure()
         for k, v in self.results.iteritems():
             ans, r = self.run_sim(**v[0])
-            r.cumsum().plot(label=k)
+            r.cumsum().plot(label='%s %.2f' % (k, r.sum()))
         plt.legend(loc='best', frameon=False)
         plt.title(self.universe, weight='bold')
 

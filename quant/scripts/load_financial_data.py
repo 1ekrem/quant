@@ -44,13 +44,15 @@ def load_lse_id(ticker):
     return lse.get_company_code(ticker)
 
 
-def load_lse_ids(missing=False):
+def load_lse_ids(missing=True):
     u = stocks.load_uk_universe()
     if 'LSE' not in u.columns:
         u.loc[:, 'LSE'] = np.nan
     if missing:
         existing = stocks.get_universe('LSE')
-        u = u.loc[~u.index.isin(existing.index)]
+        u2 = u.loc[~u.index.isin(existing.index)]
+        if not u2.empty:
+            u = u2
     ans = pd.Series([])
     i = 0
     for ticker in u.index:

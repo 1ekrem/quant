@@ -292,15 +292,16 @@ def load_uk_universe():
     return u
 
 
-def load_google_returns(start_date=None, end_date=None, data_name='Returns', data_table=GLOBAL_ASSETS):
+def load_google_returns(start_date=None, end_date=None, tickers=None, data_name='Returns', data_table=GLOBAL_ASSETS):
     if start_date is None and end_date is None:
-        return tu.get_timeseries(DATABASE_NAME, data_table, data_name=data_name)
+        return tu.get_timeseries(DATABASE_NAME, data_table, column_list=tickers, data_name=data_name)
     else:
-        return tu.get_timeseries(DATABASE_NAME, data_table, index_range=(start_date, end_date), data_name=data_name)
+        return tu.get_timeseries(DATABASE_NAME, data_table, column_list=tickers,
+                                 index_range=(start_date, end_date), data_name=data_name)
 
 
-def load_financial_data(data_name='revenue', data_table=UK_FINANCIALS):
-    return tu.get_timeseries(DATABASE_NAME, data_table, data_name=data_name)
+def load_financial_data(data_name='revenue', tickers=None, data_table=UK_FINANCIALS):
+    return tu.get_timeseries(DATABASE_NAME, data_table, column_list=tickers, data_name=data_name)
 
 
 def create_universe():

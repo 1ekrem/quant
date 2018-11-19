@@ -7,75 +7,99 @@ import pandas as pd
 import numpy as np
 from quant.lib import portfolio_utils as pu
 from quant.data import stocks
-from quant.research import cross
+from quant.research import cross, channel
 from datetime import datetime as dt
 
 STOCK_VOL_FLOOR = 0.02
+MAX_SPREAD = .02
 
 
-def get_fast_signal(rtn, rm, vol, stm=3, ns=14):
+def get_fast_signal(rtn, rm, vol, stm=3, ns=4):
     '''
     1st Gen fast signal
     '''
     s1 = -1. * cross.get_stock_mom(rm, stm)
     s2 = cross.get_stock_mom(rm, 52).shift(stm)
     s3 = cross.get_stock_mom(rm, 52)
-    base = 1. * (s1 >= 1.7) * (s3 >= -.1)
-    ans = cross.get_step_positions(s1, s2, vol, ns, None, base, holding=0)
+    base = 1. * (s1 >= 1.5) * (s3 >= -.1)
+    ans = cross.get_step_positions(s1, s2, vol, ns, base, None, holding=0)
     return ans
 
 
-def get_fast_fundamental_signal(rtn, rm, vol, score, stm=3, ns=20):
+def get_fast_fundamental_signal(rtn, rm, vol, score, stm=3, ns=4):
     '''
     1st Gen fast fundamental signal
     '''
     s1 = -1. * cross.get_stock_mom(rm, stm)
     s3 = cross.get_stock_mom(rm, 52)
-    base = 1. * (s1 >= 1.4) * (s3 >= -.4)
-    ans = cross.get_step_positions(s1, score, vol, ns, None, base, holding=0)
+    base = 1. * (s1 >= 1.5) * (s3 >= -.1)
+    ans = cross.get_step_positions(s1, score, vol, ns, base, None, holding=0)
     return ans
 
 
-def get_slow_signal(rtn, rm, vol, stm=3, ns=11):
+def get_slow_signal(rtn, rm, vol, stm=3, ns=4):
     '''
     1st Gen slow signal
     '''
     s1 = -1. * cross.get_stock_mom(rm, stm)
     s2 = cross.get_stock_mom(rm, 52).shift(stm)
     s3 = cross.get_stock_mom(rm, 52)   
-    base = 1. * (s1 >= 1.6) * (s3 >= -.1)
-    ans = cross.get_step_positions(s2, s1, vol, ns, None, base, holding=3)
+    base = 1. * (s1 >= 1.5) * (s3 >= -.1)
+    ans = cross.get_step_positions(s2, s1, vol, ns, base, None, holding=0)
     return ans
 
 
-def get_slow_fundamental_signal(rtn, rm, vol, score, stm=4, ns=10):
+def get_slow_fundamental_signal(rtn, rm, vol, score, stm=3, ns=4):
     '''
     1st Gen slow fundamental signal
     '''
     s1 = -1. * cross.get_stock_mom(rm, stm)
     s2 = cross.get_stock_mom(rm, 52).shift(stm)
     s3 = cross.get_stock_mom(rm, 52)   
-    base = 1. * (s1 >= 1.1) * (s3 >= -.5)
-    ans = cross.get_step_positions(s2, score, vol, ns, None, base, holding=3)
+    base = 1. * (s1 >= 1.5) * (s3 >= -.1)
+    ans = cross.get_step_positions(s2, score, vol, ns, base, None, holding=0)
+    return ans
+
+
+def get_channel_signal(rtn, vol, b, s, score, ns=4):
+    '''
+    1st Gen channel signal
+    '''
+    base = 1. * (b >= 1) * (s >= 1) * (score >= 0)
+    ans = cross.get_step_positions(b, s, vol, ns, base, None, holding=0)
+    return ans
+
+
+def get_channel_fundamental_signal(rtn, vol, b, s, score, ns=4):
+    '''
+    1st Gen channel signal
+    '''
+    base = 1. * (b >= 1) * (s >= 0) * (score >= 1)
+    ans = cross.get_step_positions(b, score, vol, ns, base, None, holding=0)
     return ans
 
 
 def get_smx_data():
-    return cross.get_dataset('SMX', max_spread=.025)
+    return cross.get_dataset('SMX', max_spread=MAX_SPREAD)
 
 
 def get_ftse250_data():
-    return cross.get_dataset('FTSE250', max_spread=.025)
+    return cross.get_dataset('FTSE250', max_spread=MAX_SPREAD)
 
 
 def get_aim_data():
-    return cross.get_dataset('AIM', max_spread=.025)
+    return cross.get_dataset('AIM', max_spread=MAX_SPREAD)
 
 
 def get_fundamentals(universe='SMX'):
     data = cross.load_financials(universe)
     data = cross.get_financials_overall_score(data)
     return data
+
+def get_channel(universe='SMX'):
+    b = channel.load_breakthrough_score(universe)
+    s = channel.load_support_score(universe)
+    return b, s
 
 
 def get_fast_bundle(r, rm, posvol, capital):
@@ -143,16 +167,52 @@ def get_slow_fundamental_bundle(r, rm, posvol, score, capital):
     pnl.name = 'Slow F'
     pnl_idx = pnl_idx.sum(axis=1) * c
     pnl_idx.name = 'Index'
-    return sig_date, p1, pnl, pnl_idx    
+    return sig_date, p1, pnl, pnl_idx
 
 
-def run_package(r, rm, posvol, score, capital=500):
+def get_channel_bundle(r, posvol, b, s, score, capital):
+    pos = get_channel_signal(r, posvol, b, s, score)
+    sig_date = pos.index[-1]
+    pnl = r.mul(pos.shift())
+    pos_idx = 1. / posvol.shift()
+    pnl_idx = r.mul(pos_idx.shift())
+    c = pos.sum(axis=1).mean() / pos_idx.sum(axis=1).mean()
+    p1 = pd.concat([pos.iloc[-1] * capital, pnl.iloc[-1] * capital, score.iloc[-1]], axis=1)
+    p1.columns = ['Position', 'PnL', 'Score']
+    p1 = p1.loc[p1.Position.abs() > 0]
+    pnl = pnl.sum(axis=1)
+    pnl.name = 'Channel'
+    pnl_idx = pnl_idx.sum(axis=1) * c
+    pnl_idx.name = 'Index'
+    return sig_date, p1, pnl, pnl_idx
+
+
+def get_channel_fundamental_bundle(r, posvol, b, s, score, capital):
+    pos = get_channel_fundamental_signal(r, posvol, b, s, score)
+    sig_date = pos.index[-1]
+    pnl = r.mul(pos.shift())
+    pos_idx = 1. / posvol.shift()
+    pnl_idx = r.mul(pos_idx.shift())
+    c = pos.sum(axis=1).mean() / pos_idx.sum(axis=1).mean()
+    p1 = pd.concat([pos.iloc[-1] * capital, pnl.iloc[-1] * capital, score.iloc[-1]], axis=1)
+    p1.columns = ['Position', 'PnL', 'Score']
+    p1 = p1.loc[p1.Position.abs() > 0]
+    pnl = pnl.sum(axis=1)
+    pnl.name = 'CF'
+    pnl_idx = pnl_idx.sum(axis=1) * c
+    pnl_idx.name = 'Index'
+    return sig_date, p1, pnl, pnl_idx
+
+
+def run_package(r, rm, posvol, b, s, score, capital=500):
     pos = []
     pnls = []
     sig_date, p1, pnl, pnl_idx = get_fast_bundle(r, rm, posvol, capital)
     _, p2, pnl2, _ = get_slow_bundle(r, rm, posvol, capital)
     _, p3, pnl3, _ = get_fast_fundamental_bundle(r, rm, posvol, score, capital)
     _, p4, pnl4, _ = get_slow_fundamental_bundle(r, rm, posvol, score, capital)
+    _, p5, pnl5, _ = get_channel_bundle(r, posvol, b, s, score, capital)
+    _, p6, pnl6, _ = get_channel_fundamental_bundle(r, posvol, b, s, score, capital)
     pos.append(p1)
     pnls.append(pnl)
     pos.append(p2)
@@ -161,5 +221,9 @@ def run_package(r, rm, posvol, score, capital=500):
     pnls.append(pnl3)
     pos.append(p4)
     pnls.append(pnl4)
+    pos.append(p5)
+    pnls.append(pnl5)
+    pos.append(p6)
+    pnls.append(pnl6)
     pnls.append(pnl_idx)
     return sig_date, pos, pnls

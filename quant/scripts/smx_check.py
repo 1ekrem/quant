@@ -37,9 +37,12 @@ def plot_pnl(pnls):
 
 def run_smx_check(capital=200):
     r, rm, posvol, volume = sm.get_smx_data()
-    f = sm.get_fundamentals('SMX')
+    f = sm.get_fundamentals('SMX').reindex(r.columns, axis=1)
     score = tu.resample(f, r)
-    sig_date, pos, pnls = sm.run_package(r, rm, posvol, score, capital)
+    b, s = sm.get_channel('SMX')
+    b = b.reindex(r.columns, axis=1)
+    s = s.reindex(r.columns, axis=1)
+    sig_date, pos, pnls = sm.run_package(r, rm, posvol, b, s, score, capital)
     table = np.round(100. * pd.concat(pnls, axis=1).iloc[-6:], 2)
     table.columns = [x + ' (%)' for x in table.columns]
     table.index = [x.strftime('%Y-%m-%d') for x in table.index]
