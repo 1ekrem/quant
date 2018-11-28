@@ -8,7 +8,7 @@ import time
 import numpy as np
 import pandas as pd
 import googlefinance.client as gc
-from quant.lib import data_utils as du, timeseries_utils as tu, portfolio_utils as pu
+from quant.lib import data_utils as du, timeseries_utils as tu, portfolio_utils as pu, web_utils as wu
 from quant.lib.main_utils import logger
 from quant.data import quandldata
 from datetime import datetime as dt
@@ -127,6 +127,10 @@ def _divide_hundred(x):
     return ans
  
 
+def _remove_zero(x):
+    return x.loc[~(x == 0.).any(axis=1)]
+
+
 def load_yahoo_prices(ticker, start_date=dt(2018,7,1), end_date=dt.today()):
     try:
         data = yf.download(ticker, start=start_date, end=end_date)
@@ -145,6 +149,21 @@ def load_google_prices(ticker, exchange='LON', period='1Y'):
         logger.warn('Failed: %s' % str(e))
         return pd.DataFrame([])
 
+
+def load_av_prices(ticker, output_size='compact'):
+    ans = pd.DataFrame([])
+    try:
+        data = wu.load_alpha_vantage(ticker, output_size=output_size)
+        if data is not None:
+            ans = pd.DataFrame(data).T
+            ans.index = pd.DatetimeIndex(ans.index)
+            ans.loc[:, 'Close'] = ans.loc[:, '5. adjusted close'].astype(float)
+            ans.loc[:, 'Volume'] = ans.loc[:, '6. volume'].astype(float)
+            ans = _remove_zero(ans[['Close', 'Volume']])
+    except Exception as e:
+        logger.warn('Failed: %s' % str(e))
+    return ans
+        
 
 def save_data(data, ticker, data_table, load_volume=True, clean_data=True):
     data = data.resample('B').last()
@@ -237,7 +256,7 @@ def import_uk_yahoo_prices(years=1, missing=False):
     i = 0
     for idx in u.index:
         i += 1
-        if i % 30 == 0:
+        if i % 25 == 0:
             logger.info('Waiting...')
             time.sleep(60 * 15)
         import_yahoo_prices(idx + '.L', idx, start_date, end_date, data_table=UK_STOCKS,

@@ -56,7 +56,7 @@ def get_hl_stocks_table(url):
                    'JPMORGAN', 'ALPHA', 'BAILLIE GIFFORD', 'CREDIT', 'REAL ESTATE', 'EQUITY', 'GBP',
                    'CAPITAL', 'INFRASTRUCTURE', 'SYNCONA', 'F&C', 'INTERNATIONAL PUBLIC PARTNERSHIPS',
                    'PERSHING SQUARE', 'MARKETS', 'JUPITER', 'PHOENIX SPREE', 'PICTON', 'JOHN LAING', 'SICAV',
-                   'RIVERSTONE', 'GREENCOAT']:
+                   'RIVERSTONE', 'GREENCOAT', 'BMO']:
             ans = ans.loc[~ans.u.str.contains(kw)]
         return ans.Name
     else:

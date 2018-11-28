@@ -204,7 +204,7 @@ class Momentum(object):
         data = get_financials_overall_score(self.financials)
         self.score = tu.resample(data, self.rtn).reindex(self.rtn.columns, axis=1)
     
-    def run_sim(self, stm=3, ns=10, min_fast=0., min_slow=0., min_dd=None,
+    def run_sim(self, stm=3, ns=15, min_fast=0., min_slow=0., min_dd=None,
                 fast=True, fundamental=False):
         s1 = -1. * get_stock_mom(self.rm, stm)
         s2 = get_stock_mom(self.rm, 52).shift(stm)
@@ -215,7 +215,8 @@ class Momentum(object):
             input2 = self.score
         else:
             input2 = s2 if fast else s1
-        f = 1. * (s1 >= min_fast) * (s3 >= min_slow)
+        good = s3.subtract(s3.median(axis=1), axis=0)
+        f = 1. * (s1 >= min_fast) * (s3 >= min_slow) * (good >= 0)
         if min_dd is not None:
             f = f * (self.dd >= min_dd)
         ans = get_step_positions(input1, input2, self.vol, ns, f, None, holding=holding)
@@ -270,7 +271,7 @@ class Momentum(object):
     
     def get_fast_set(self, base):
         ans = []
-        x = np.arange(-.5, 1.51, .1)
+        x = np.arange(-.1, 1.51, .1)
         for i, k in enumerate(x):
             msg = 'fast: %.1f .. %.1f%%' % (k, 100. * (i + 1) / len(x))
             new = base.copy()
@@ -280,7 +281,7 @@ class Momentum(object):
 
     def get_slow_set(self, base):
         ans = []
-        x = np.arange(-.5, 1.1, .1)
+        x = np.arange(-.1, 1.51, .1)
         for i, k in enumerate(x):
             msg = 'slow: %.1f .. %.1f%%' % (k, 100. * (i + 1) / len(x))
             new = base.copy()
@@ -351,9 +352,9 @@ class Momentum(object):
     def run_all(self):
         ans = {}
         ans['Fast'] = self.run_fast()
-        ans['Slow'] = self.run_slow()
-        ans['Fast fundamental'] = self.run_fast_fundamental()
-        ans['Slow fundamental'] = self.run_slow_fundamental()
+        #ans['Slow'] = self.run_slow()
+        #ans['Fast fundamental'] = self.run_fast_fundamental()
+        #ans['Slow fundamental'] = self.run_slow_fundamental()
         self.results = ans
     
     def patch_results(self):
@@ -378,3 +379,9 @@ class Momentum(object):
         plt.legend(loc='best', frameon=False)
         plt.title(self.universe, weight='bold')
 
+    def get_positions(self):
+        pos = {}
+        for k, v in self.results.iteritems():
+            ans, r = self.run_sim(**v[0])
+            pos[k] = ans
+        return pos

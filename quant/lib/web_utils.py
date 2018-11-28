@@ -1,8 +1,7 @@
 from quant.lib.main_utils import *
-import requests
+import requests, urllib, json
 from bs4 import BeautifulSoup
 from googlesearch import search
-
 
 HEADERS = requests.utils.default_headers()
 HEADERS.update({
@@ -10,6 +9,9 @@ HEADERS.update({
 })
 GOOGLEURL = 'https://www.google.com/search?client=ubuntu&channel=fs&q=%s&ie=utf-8&oe=utf-8&start=%d'
 GOOGLEREPLACE = {'%3F': '?', '%3D': '=', '%3A': ':'}
+APIKEY = '37ORV4265X088WZ5'
+AVFIELDS = {'TIME_SERIES_DAILY_ADJUSTED': 'Time Series (Daily)'}
+TIINGO = 'b6e8d5e094ea73542bf882ca1a3869ce6f78741d'
 
 
 def get_page(url):
@@ -74,3 +76,21 @@ def run_google_search(question):
     except:
         s = GoogleSearch(question)
         return [x[1] for x in s.results]
+
+
+def load_alpha_vantage(ticker, function='TIME_SERIES_DAILY_ADJUSTED', output_size='compact'):
+    url = 'https://www.alphavantage.co/query?function=%s&symbol=%s&outputsize=%s&apikey=%s' % (function, ticker, output_size, APIKEY)
+    response = urllib.urlopen(url)
+    data = json.loads(response.read())
+    return data.get(AVFIELDS.get(function))
+
+
+def load_tiingo(ticker, start_date=dt(2018, 1, 1), end_date=dt.today()):
+    headers = {
+       'Content-Type': 'application/json',
+       'Authorization' : 'Token %s' % TIINGO
+       }
+    url = 'https://api.tiingo.com/tiingo/daily/%s/prices?startDate=%s&endDate=%s' % (ticker, start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'))
+    response = requests.get(url, headers=headers)
+    return response.json()
+
