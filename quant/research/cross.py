@@ -204,29 +204,29 @@ class Momentum(object):
         data = get_financials_overall_score(self.financials)
         self.score = tu.resample(data, self.rtn).reindex(self.rtn.columns, axis=1)
     
-    def run_sim(self, stm=3, ns=15, min_fast=0., min_slow=0., min_dd=None,
-                fast=True, fundamental=False):
-        s1 = -1. * get_stock_mom(self.rm, stm)
+    def run_sim(self, stm=4, ns=10, min_fast=0., min_slow=0., fast=True, fundamental=False, good=False):
+        s1 = -1. * get_stock_mom(self.rm, stm).abs()
         s2 = get_stock_mom(self.rm, 52).shift(stm)
         s3 = get_stock_mom(self.rm, 52)
         holding = 0
-        input1 = s1 if fast else s2
+        input1 = s1 if fast else s1 + s2
         if fundamental:
             input2 = self.score
         else:
-            input2 = s2 if fast else s1
-        good = s3.subtract(s3.median(axis=1), axis=0)
-        f = 1. * (s1 >= min_fast) * (s3 >= min_slow) * (good >= 0)
-        if min_dd is not None:
-            f = f * (self.dd >= min_dd)
+            input2 = s1 + s2 if fast else s1
+        f = 1. * (s1 >= min_fast) * (s3 >= min_slow)
+        if good:
+            g = s3.subtract(s3.median(axis=1), axis=0)
+            f = f * (g >= 0)
         ans = get_step_positions(input1, input2, self.vol, ns, f, None, holding=holding)
         ra = get_portfolio_returns(ans, self.rtn)
         return ans, ra
     
     def get_sim_analytics(self, ans, ra):
         s = pd.Series([])
-        s.loc['total'] = ra.sum()
-        s.loc['recent'] = ra[dt(2014,1,1):].sum()
+        end_date = dt(2018, 10, 31)
+        s.loc['total'] = ra[:end_date].sum()
+        s.loc['recent'] = ra[dt(2014,1,1):end_date].sum()
         s.loc['n'] = (ans > 0).sum(axis=1).mean()
         s.loc['nc'] = (ans > 0)[dt(2014, 1, 1):].sum(axis=1).mean()
         return s
@@ -271,7 +271,7 @@ class Momentum(object):
     
     def get_fast_set(self, base):
         ans = []
-        x = np.arange(-.1, 1.51, .1)
+        x = np.arange(0., 1.01, .1)
         for i, k in enumerate(x):
             msg = 'fast: %.1f .. %.1f%%' % (k, 100. * (i + 1) / len(x))
             new = base.copy()
@@ -281,7 +281,7 @@ class Momentum(object):
 
     def get_slow_set(self, base):
         ans = []
-        x = np.arange(-.1, 1.51, .1)
+        x = np.arange(0., 1.01, .1)
         for i, k in enumerate(x):
             msg = 'slow: %.1f .. %.1f%%' % (k, 100. * (i + 1) / len(x))
             new = base.copy()
@@ -311,6 +311,9 @@ class Momentum(object):
     def get_slow_fundamental(self):
         return {'fast': False, 'fundamental': True}
     
+    def get_good(self):
+        return {'fast': True, 'fundamental': False, 'good': True}
+
     def run_test(self, base):
 
         logger.info('Testing fast')
@@ -349,26 +352,31 @@ class Momentum(object):
         base = self.get_slow_fundamental()
         return self.run_test(base)
     
+    def run_good(self):
+        base = self.get_good()
+        return self.run_test(base)
+
     def run_all(self):
         ans = {}
         ans['Fast'] = self.run_fast()
-        #ans['Slow'] = self.run_slow()
-        #ans['Fast fundamental'] = self.run_fast_fundamental()
-        #ans['Slow fundamental'] = self.run_slow_fundamental()
+        ans['Slow'] = self.run_slow()
+        ans['Fast fundamental'] = self.run_fast_fundamental()
+        ans['Slow fundamental'] = self.run_slow_fundamental()
+        ans['Good'] = self.run_good()
         self.results = ans
     
     def patch_results(self):
         self.results = {'Fast': [{'fast': True, 'fundamental': False,
-                                              'min_fast': 1.5, 'min_slow': -.1,
+                                              'min_fast': 0., 'min_slow': 0.,
                                               'ns': 4, 'stm': 3}],
                         'Fast Fundamental': [{'fast': True, 'fundamental': True,
-                                              'min_fast': 1.5, 'min_slow': -.1,
+                                              'min_fast': 0., 'min_slow': 0.,
                                               'ns': 4, 'stm': 3}],
                         'Slow': [{'fast': False, 'fundamental': False,
-                                              'min_fast': 1.5, 'min_slow': -.1,
+                                              'min_fast': 0., 'min_slow': 0.,
                                               'ns': 4, 'stm': 3}],
                         'Slow Fundamental': [{'fast': False, 'fundamental': True,
-                                              'min_fast': 1.5, 'min_slow': -.1,
+                                              'min_fast': 0., 'min_slow': 0.,
                                               'ns': 4, 'stm': 3}]}
 
     def plot_simulations(self):

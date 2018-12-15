@@ -21,6 +21,7 @@ STOCKS_DESCRIPTION = 'stocks_description'
 GLOBAL_ASSETS = 'global_assets'
 UK_STOCKS = 'uk_stocks'
 UK_FINANCIALS = 'uk_financials'
+UK_ESTIMATES = 'uk_estimates'
 SMX_EXCLUDED = ['BGS']
 FTSE250_EXCLUDED = ['PIN', 'UKCM']
 FTSE100_EXCLUDED = []
@@ -31,6 +32,7 @@ def create_google_table():
     du.create_t2_timeseries_table(DATABASE_NAME, GLOBAL_ASSETS)
     du.create_t2_timeseries_table(DATABASE_NAME, UK_STOCKS)
     du.create_t2_timeseries_table(DATABASE_NAME, UK_FINANCIALS)
+    du.create_t2_timeseries_table(DATABASE_NAME, UK_ESTIMATES)
 
 
 # Tickers

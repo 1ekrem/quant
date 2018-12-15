@@ -43,125 +43,159 @@ def get_width(k, p, x):
     return np.max(y) - np.min(y)
 
 
-def find_channel(r, margin=.025, touch_lookback=3):
+def get_pivot_index(x_in, low_touch, dlow, dmin):
+    x = x_in[low_touch]
+    if len(x) > 1:
+        x = x[np.hstack((np.array([True]), dlow > dmin))]
+    return x[-1]
+
+
+def get_channel_stats(x_in, y_in, y, b, h, margin, head_period, gap_period):
+    ans = {}
+    dmin = np.max((len(x_in) * gap_period, 3.))
+    hmin = np.int(np.max((len(x_in) * head_period, 3.)))
+    low = b + margin * h
+    high = b + (1. - margin) * h
+    low_touch = y_in < low
+    high_touch = y_in > high
+    sig = np.zeros(len(y_in)) * np.nan
+    sig[low_touch] = 1.
+    sig[high_touch] = -1.
+    sig = pd.Series(sig).ffill().values[-1]
+    if y[-1] > b + h:
+        sig = 2.
+    elif y[-1] < b:
+        sig = -2.
+    z = y[-1] / h
+    dlow = np.diff(x_in[low_touch])
+    dhigh = np.diff(x_in[high_touch])
+    f = np.sum(low_touch) + np.sum(high_touch) - np.sum(dhigh <= dmin) - np.sum(dlow <= dmin)
+    plow = get_pivot_index(x_in, low_touch, dlow, dmin)
+    phigh = get_pivot_index(x_in, high_touch, dhigh, dmin)    
+    ans['head'] = np.any(high_touch[:hmin]) or np.any(low_touch[:hmin])
+    ans['tail'] = np.any(high_touch[-hmin:]) or np.any(low_touch[-hmin:])
+    ans['signal'] = sig
+    ans['z'] = z
+    ans['points'] = f
+    ans['pivot'] = np.min((plow, phigh))
+    return ans
+
+    
+def calculate_channel(r, margin=.025, shift_period=2, head_period=.05, gap_period=.05):
     p = trim(r).cumsum().values
     x = get_x(p)
-    o = op.fmin_slsqp(get_width, 0., args=(p, x), iprint=0)
+    p_in = p[:-shift_period]
+    x_in = x[:-shift_period]
+    o = op.fmin_slsqp(get_width, 0., args=(p_in, x_in), iprint=0)
     k = o[0]
     y = get_y(p, x, k)
-    b = np.min(y)
-    h = np.max(y) - b
-    x1 = b + margin * h
-    x2 = b + (1. - margin) * h
-    low_touch = y < x1
-    high_touch = y > x2
-    f = np.sum(low_touch) + np.sum(high_touch)
-    th = np.any(high_touch[:touch_lookback])
-    tl = np.any(low_touch[:touch_lookback])
-    return k, b, h, f, th, tl
+    y_in = y[:-shift_period]
+    b = np.min(y_in)
+    h = np.max(y_in) - b
+    ans = get_channel_stats(x_in, y_in, y, b, h, margin, head_period, gap_period)
+    return k, b, h, ans
 
 
-def get_breakthrough_signal(r, lookback=20, margin=.025, touch_lookback=3):
+def search_channel(r, margin=.025, shift_period=2, gap_period=.05):
+    k, b, h, ans = calculate_channel(r, margin=margin, shift_period=shift_period, gap_period=gap_period)
+    rs = trim(r).iloc[ans.get('pivot'):]
+    return k, b, h, ans, rs
+
+
+def get_channel_set(r, margin=.025, shift_period=2, gap_period=.05, min_lookback=40, diagnose=False):
+    results = []
+    _, _, _, _, rs = search_channel(r, margin=margin, shift_period=shift_period, gap_period=gap_period)
+    i = 0
+    while len(rs) > min_lookback and i < 20:
+        k, b, h, ans, rx = search_channel(rs, margin=margin, shift_period=shift_period, gap_period=gap_period)
+        if diagnose:
+            plt.figure()
+            rs.cumsum().plot()
+            plot_channel(rs, k, b, h)
+            plt.title('%d %d' % (len(rs), ans.get('points')))
+        results.append((k, b, h, ans, rs))
+        rs = rx
+        i += 1
+    return results
+
+
+def get_signal(r):
     rtn = trim(r)
-    ans = []
-    for i in xrange(lookback, len(rtn) + 1):
-        s = rtn.iloc[i - lookback:i]
-        p = s.cumsum()
-        k, b, h, f, th, tl = find_channel(s.iloc[:-1], margin, touch_lookback)
-        x = get_x(s)
-        upper = k * x + b + h
-        lower = k * x + b
-        signal = np.nan
-        if f > 3:
-            if p.iloc[-1] < lower[-1] and p.iloc[-2] >= lower[-2]:
-                signal = -1
-            elif p.iloc[-1] > upper[-1] and p.iloc[-2] <= upper[-2]:
-                signal = 1
-        ans.append([signal, signal if k > 0 else np.nan, signal if k < 0 else np.nan])
-    cols = pd.MultiIndex.from_arrays([[r.name] * 3, ['All', 'Up', 'Down']], names=('Ticker', 'Channel'))
-    ans = pd.DataFrame(ans, index=rtn.index[lookback-1:], columns=cols)
-    return ans
-
-
-def get_support_signal(r, lookback=20, margin=.025, touch_lookback=3):
-    rtn = trim(r)
-    ans = []
-    for i in xrange(lookback, len(rtn) + 1):
-        s = rtn.iloc[i - lookback:i]
-        p = s.cumsum()
-        k, b, h, f, th, tl = find_channel(s.iloc[:-1], margin, touch_lookback)
-        x = get_x(s)
-        upper = k * x + b + h
-        lower = k * x + b
-        signal = np.nan
-        if f > 3:
-            if p.iloc[-1] > lower[-1] and tl:
-                signal = 1
-            elif p.iloc[-1] < upper[-1] and th:
-                signal = -1
-        ans.append([signal, signal if k > 0 else np.nan, signal if k < 0 else np.nan])
-    cols = pd.MultiIndex.from_arrays([[r.name] * 3, ['All', 'Up', 'Down']], names=('Ticker', 'Channel'))
-    ans = pd.DataFrame(ans, index=rtn.index[lookback-1:], columns=cols)
-    return ans
+    ans = np.nan * rtn.resample('W').last()
+    ans2 = ans.copy()
+    for idx in ans.index[52:]:
+        a = get_channel_set(rtn[:idx])
+        if len(a) > 0:
+            ans.loc[idx] = a[-1][3].get('signal')
+            ans2.loc[idx] = a[-1][3].get('z')
+    return ans, ans2
 
 
 def cache_channel_signal(universe='SMX'):
-    rtn, rm, vol, volume = cross.get_dataset(universe, max_spread=None)
+    rtn, rs, rm, v = get_dataset(universe)
     score = []
-    score2 = []
+    points = []
     for c in rtn.columns:
         logger.info('Running %s' % c)
-        s = None
-        s2 = None
-        for i in [8, 13, 20, 26, 40, 52]:
-            sig = get_breakthrough_signal(rtn.loc[:, c], i).ffill(limit=3)
-            if s is None:
-                s = sig
-            else:
-                s = s.add(sig, fill_value=0.)
-            sig = get_support_signal(rtn.loc[:, c], i).ffill(limit=3)
-            if s2 is None:
-                s2 = sig
-            else:
-                s2 = s2.add(sig, fill_value=0.)
+        s, p = get_signal(rtn.loc[:, c])
         score.append(s)
-        score2.append(s2)
+        points.append(p)
     score = pd.concat(score, axis=1)
-    score2 = pd.concat(score2, axis=1)
-    write_pickle(score, PATH + universe + ' b.dat')
-    write_pickle(score2, PATH + universe + ' s.dat')
+    points = pd.concat(points, axis=1)
+    write_pickle((score, points), PATH + universe + ' signal.dat')
 
 
-def load_breakthrough_signal(universe='SMX'):
-    return load_pickle(PATH + universe + ' b.dat')
-
-
-def load_support_signal(universe='SMX'):
-    return load_pickle(PATH + universe + ' s.dat')
-
-
-def group_level(data, key='All'):
-    ans = data.loc[:, data.columns.get_level_values(1) == key]
-    ans.columns = ans.columns.get_level_values(0)
-    return ans
+def load_channel_signal(universe='SMX'):
+    return load_pickle(PATH + universe + ' signal.dat')
 
 
 def test_combo(universe='SMX'):
-    plt.figure()
-    rtn, rm, vol, volume = cross.get_dataset(universe, max_spread=.02)
-    f = cross.load_financials(universe)
-    s = tu.resample(cross.get_financials_overall_score(f), rtn)
-    b = group_level(load_breakthrough_signal(universe), 'Down').reindex(rtn.columns, axis=1).ffill(limit=1)
-    b2 = group_level(load_support_signal(universe), 'Down').reindex(rtn.columns, axis=1).ffill(limit=1)
-    pos = (b > 0).divide(vol)
-    pos2 = (b2 > 0).divide(vol)
-    pos3 = (b2 > 0) * (b > 0) * (s >= 0).divide(vol)
-    cross.get_portfolio_returns(pos, rtn).cumsum().plot(label='Breakthrough')
-    cross.get_portfolio_returns(pos2, rtn).cumsum().plot(label='Support')
-    cross.get_portfolio_returns(pos3, rtn).cumsum().plot(label='Combo')
-    plt.legend(loc='best', frameon=False)
+    rtn, rs, rm, vol = get_dataset(universe, max_spread=.02)
+    s, p, s2, p2 = load_channel_signal(universe)
+    #f = cross.load_financials(universe)
+    #s = tu.resample(cross.get_financials_overall_score(f), rtn)
     
+    plt.figure()
+    pos = (s == 2) * (s2 == -1).divide(vol)
+    cross.get_portfolio_returns(pos.ffill(limit=3), rs).cumsum().plot(label='Revert break')
+    pos2 = (s == 2) * (s2 == 1).divide(vol)
+    cross.get_portfolio_returns(pos2.ffill(limit=3), rs).cumsum().plot(label='Trend break')
+    pos3 = (s == 2) * (s2 == 2).divide(vol)
+    cross.get_portfolio_returns(pos2.ffill(limit=3), rs).cumsum().plot(label='Both break')
+    plt.legend(loc='best', frameon=False)
+    plt.title('Break', weight='bold')
+    
+    plt.figure()
+    pos = (s == 1) * (s2 == -1).divide(vol)
+    cross.get_portfolio_returns(pos.ffill(limit=3), rs).cumsum().plot(label='Revert')
+    pos2 = (s == 1) * (s2 == 1).divide(vol)
+    cross.get_portfolio_returns(pos2.ffill(limit=3), rs).cumsum().plot(label='Trend')
+    pos3 = (s == 1) * (s2 == 2).divide(vol)
+    cross.get_portfolio_returns(pos2.ffill(limit=3), rs).cumsum().plot(label='Follow break')
+    plt.legend(loc='best', frameon=False)
+    plt.title('Follow', weight='bold')
 
+    plt.figure()
+    pos = (s == -2) * (s2 == -1).divide(vol)
+    cross.get_portfolio_returns(pos.ffill(limit=3), rs).cumsum().plot(label='break down')
+    pos2 = (s == -2) * (s2 == 1).divide(vol)
+    cross.get_portfolio_returns(pos2.ffill(limit=3), rs).cumsum().plot(label='break up')
+    pos3 = (s == -2) * (s2 == 2).divide(vol)
+    cross.get_portfolio_returns(pos2.ffill(limit=3), rs).cumsum().plot(label='break')
+    plt.legend(loc='best', frameon=False)
+    plt.title('Break', weight='bold')
+    
+    plt.figure()
+    pos = (s == -1) * (s2 == -1).divide(vol)
+    cross.get_portfolio_returns(pos.ffill(limit=3), rs).cumsum().plot(label='drop down')
+    pos2 = (s == -1) * (s2 == 1).divide(vol)
+    cross.get_portfolio_returns(pos2.ffill(limit=3), rs).cumsum().plot(label='drop up')
+    pos3 = (s == -1) * (s2 == 2).divide(vol)
+    cross.get_portfolio_returns(pos2.ffill(limit=3), rs).cumsum().plot(label='drop break')
+    plt.legend(loc='best', frameon=False)
+    plt.title('Follow', weight='bold')
+
+    
 def plot_channel(r, k, b, h):
     rtn = trim(r)
     x = get_x(rtn)
@@ -191,30 +225,30 @@ class Momentum(object):
         self.financials = cross.load_financials(self.universe)
         x = cross.get_financials_overall_score(self.financials)
         self.score = tu.resample(x, self.rtn).reindex(self.rtn.columns, axis=1)
-        s1 = group_level(load_breakthrough_signal(self.universe), self.channel_type)
-        self.s1 = s1.reindex(self.rtn.columns, axis=1).fillna(0.)
-        s2 = group_level(load_support_signal(self.universe), self.channel_type)
-        self.s2 = s2.reindex(self.rtn.columns, axis=1).fillna(0.)
+        s, p = load_channel_signal(self.universe)
+        self.sig = s.reindex(self.rtn.columns, axis=1).fillna(0.)
+        self.z = p.reindex(self.rtn.columns, axis=1).fillna(0.)
 
-    def run_sim(self, stm=3, ns=10, min_fast=0., min_slow=0., fast=True, fundamental=False):
+    def run_sim(self, stm=3, ns=15, min_fast=0., min_slow=0., max_z=1., fast=True, fundamental=False):
         s1 = -1. * cross.get_stock_mom(self.rm, stm)
         s2 = cross.get_stock_mom(self.rm, 52).shift(stm)
         s3 = cross.get_stock_mom(self.rm, 52)
         holding = 0
-        input1 = self.s1 if fast else self.s2
+        input1 = s1 if fast else s2
         if fundamental:
             input2 = self.score
         else:
-            input2 = self.s2 if fast else self.s1
-        f = 1. * (s1 >= min_fast) * (s3 >= min_slow)
+            input2 = s2 if fast else s1
+        f = 1. * (s1 >= min_fast) * (s3 >= min_slow) * (self.z <= max_z) * (self.z >= 0)
         ans = cross.get_step_positions(input1, input2, self.vol, ns, f, None, holding=holding)
         ra = cross.get_portfolio_returns(ans, self.rtn)
         return ans, ra
     
     def get_sim_analytics(self, ans, ra):
+        end_date = dt(2018, 10, 31)
         s = pd.Series([])
-        s.loc['total'] = ra.sum()
-        s.loc['recent'] = ra[dt(2014,1,1):].sum()
+        s.loc['total'] = ra[:end_date].sum()
+        s.loc['recent'] = ra[dt(2014,1,1):end_date].sum()
         s.loc['n'] = (ans > 0).sum(axis=1).mean()
         s.loc['nc'] = (ans > 0)[dt(2014, 1, 1):].sum(axis=1).mean()
         return s
@@ -236,16 +270,6 @@ class Momentum(object):
             analytics.append(a)
         analytics = pd.concat(analytics, axis=1).T
         return analytics
-        
-    def get_stm_set(self, base):
-        ans = []
-        x = np.arange(3, 14)
-        for i, k in enumerate(x):
-            msg = 'stm: %d .. %.1f%%' % (k, 100. * (i + 1) / len(x))
-            new = base.copy()
-            new['stm'] = k
-            ans.append((k, msg, new))
-        return ans
     
     def get_stocks_set(self, base):
         ans = []
@@ -259,7 +283,7 @@ class Momentum(object):
     
     def get_fast_set(self, base):
         ans = []
-        x = np.arange(-.5, 1.1, .1)
+        x = np.arange(0., 1.1, .1)
         for i, k in enumerate(x):
             msg = 'fast: %.1f .. %.1f%%' % (k, 100. * (i + 1) / len(x))
             new = base.copy()
@@ -269,11 +293,21 @@ class Momentum(object):
 
     def get_slow_set(self, base):
         ans = []
-        x = np.arange(-.5, 1.1, .1)
+        x = np.arange(0., 1.1, .1)
         for i, k in enumerate(x):
             msg = 'slow: %.1f .. %.1f%%' % (k, 100. * (i + 1) / len(x))
             new = base.copy()
             new['min_slow'] = k
+            ans.append((k, msg, new))
+        return ans
+
+    def get_z_set(self, base):
+        ans = []
+        x = np.arange(0.1, 1.01, .1)
+        for i, k in enumerate(x):
+            msg = 'z: %.1f .. %.1f%%' % (k, 100. * (i + 1) / len(x))
+            new = base.copy()
+            new['max_z'] = k
             ans.append((k, msg, new))
         return ans
 
@@ -290,18 +324,24 @@ class Momentum(object):
         return {'fast': False, 'fundamental': True}
     
     def run_test(self, base):
-
-        logger.info('Testing slow')
-        set4 = self.get_slow_set(base)
-        a4 = self.run_pass(set4)
-        min_slow = self.decide(a4)
-        base['min_slow'] = min_slow
+        
+        logger.info('Testing z')
+        set2 = self.get_z_set(base)
+        a2 = self.run_pass(set2)
+        max_z = self.decide(a2)
+        base['max_z'] = max_z
 
         logger.info('Testing fast')
         set2 = self.get_fast_set(base)
         a2 = self.run_pass(set2)
         min_fast = self.decide(a2)
         base['min_fast'] = min_fast
+        
+        logger.info('Testing slow')
+        set4 = self.get_slow_set(base)
+        a4 = self.run_pass(set4)
+        min_slow = self.decide(a4)
+        base['min_slow'] = min_slow
 
         logger.info('Testing ns')
         set3 = self.get_stocks_set(base)
@@ -331,8 +371,8 @@ class Momentum(object):
         ans = {}
         ans['Fast'] = self.run_fast()
         ans['Slow'] = self.run_slow()
-        ans['Fast fundamental'] = self.run_fast_fundamental()
-        ans['Slow fundamental'] = self.run_slow_fundamental()
+        ans['Fast f'] = self.run_fast_fundamental()
+        ans['Slow f'] = self.run_slow_fundamental()
         self.results = ans
     
     def patch_results(self):

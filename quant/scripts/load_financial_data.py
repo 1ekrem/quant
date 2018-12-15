@@ -1,5 +1,4 @@
 from quant.lib.main_utils import *
-import time
 from quant.lib import timeseries_utils as tu
 from quant.data import stocks
 from quant.scripts import proactive, investegate, lse
@@ -46,13 +45,9 @@ def load_lse_id(ticker):
 
 def load_lse_ids(missing=True):
     u = stocks.load_uk_universe()
-    if 'LSE' not in u.columns:
-        u.loc[:, 'LSE'] = np.nan
     if missing:
         existing = stocks.get_universe('LSE')
-        u2 = u.loc[~u.index.isin(existing.index)]
-        if not u2.empty:
-            u = u2
+        u = u.loc[~u.index.isin(existing.index)]
     ans = pd.Series([])
     i = 0
     for ticker in u.index:

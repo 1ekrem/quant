@@ -9,9 +9,19 @@ from quant.lib import portfolio_utils as pu
 from quant.data import stocks
 from quant.research import cross, channel
 from datetime import datetime as dt
+from statsmodels.tsa.vector_ar.util import get_index
 
 STOCK_VOL_FLOOR = 0.02
 MAX_SPREAD = .02
+
+
+def get_index_signal(rm, vol, stm=3):
+    '''
+    1st Gen fast signal
+    '''
+    all = 1. / vol
+    all /= all.sum(axis=1).mean()
+    return all
 
 
 def get_fast_signal(rtn, rm, vol, stm=3, ns=4, min_fast=1.5, min_slow=-.1):
@@ -91,26 +101,20 @@ def get_fundamentals(universe='SMX'):
     data = cross.get_financials_overall_score(data)
     return data
 
-def get_channel(universe='SMX'):
-    b = channel.load_breakthrough_score(universe)
-    s = channel.load_support_score(universe)
-    return b, s
-
 
 def get_fast_bundle(r, rm, posvol, capital, stm=3, ns=4, min_fast=1.5, min_slow=-.1):
     pos = get_fast_signal(r, rm, posvol, stm=stm, ns=ns, min_fast=min_fast, min_slow=min_slow)
+    a = get_index_signal(rm, posvol, stm)
+    c = pos.sum(axis=1).mean()
     sig_date = pos.index[-1]
     pnl = r.mul(pos.shift())
-    pos_idx = 1. / posvol.shift()
-    pnl_idx = r.mul(pos_idx.shift())
-    c = pos.sum(axis=1).mean() / pos_idx.sum(axis=1).mean()
+    pnl_idx = r.mul(a.shift()).sum(axis=1) * c
+    pnl_idx.name = 'Index'
     p1 = pd.concat([pos.iloc[-1], pnl.iloc[-1]], axis=1) * capital
     p1.columns = ['Position', 'PnL']
-    p1 = p1.loc[p1.Position.abs() > 0]
+    p1 = p1.loc[(p1.abs() > 0).any(axis=1)]
     pnl = pnl.sum(axis=1)
     pnl.name = 'Fast'
-    pnl_idx = pnl_idx.sum(axis=1) * c
-    pnl_idx.name = 'Index'
     return sig_date, p1, pnl, pnl_idx
 
 
@@ -123,7 +127,7 @@ def get_fast_fundamental_bundle(r, rm, posvol, score, capital, stm=3, ns=4, min_
     c = pos.sum(axis=1).mean() / pos_idx.sum(axis=1).mean()
     p1 = pd.concat([pos.iloc[-1], pnl.iloc[-1]], axis=1) * capital
     p1.columns = ['Position', 'PnL']
-    p1 = p1.loc[p1.Position.abs() > 0]
+    p1 = p1.loc[(p1.abs() > 0).any(axis=1)]
     pnl = pnl.sum(axis=1)
     pnl.name = 'Fast F'
     pnl_idx = pnl_idx.sum(axis=1) * c
@@ -133,18 +137,17 @@ def get_fast_fundamental_bundle(r, rm, posvol, score, capital, stm=3, ns=4, min_
 
 def get_slow_bundle(r, rm, posvol, capital, stm=3, ns=4, min_fast=1.5, min_slow=-.1):
     pos = get_slow_signal(r, rm, posvol, stm=stm, ns=ns, min_fast=min_fast, min_slow=min_slow)
+    a = get_index_signal(rm, posvol, stm)
+    c = pos.sum(axis=1).mean()
     sig_date = pos.index[-1]
     pnl = r.mul(pos.shift())
-    pos_idx = 1. / posvol.shift()
-    pnl_idx = r.mul(pos_idx.shift())
-    c = pos.sum(axis=1).mean() / pos_idx.sum(axis=1).mean()
+    pnl_idx = r.mul(x.shift()).sum(axis=1) * c
+    pnl_idx.name = 'Index'
     p1 = pd.concat([pos.iloc[-1], pnl.iloc[-1]], axis=1) * capital
     p1.columns = ['Position', 'PnL']
-    p1 = p1.loc[p1.Position.abs() > 0]
+    p1 = p1.loc[(p1.abs() > 0).any(axis=1)]
     pnl = pnl.sum(axis=1)
     pnl.name = 'Slow'
-    pnl_idx = pnl_idx.sum(axis=1) * c
-    pnl_idx.name = 'Index'
     return sig_date, p1, pnl, pnl_idx    
 
 
@@ -157,7 +160,7 @@ def get_slow_fundamental_bundle(r, rm, posvol, score, capital, stm=3, ns=4, min_
     c = pos.sum(axis=1).mean() / pos_idx.sum(axis=1).mean()
     p1 = pd.concat([pos.iloc[-1], pnl.iloc[-1]], axis=1) * capital
     p1.columns = ['Position', 'PnL']
-    p1 = p1.loc[p1.Position.abs() > 0]
+    p1 = p1.loc[(p1.abs() > 0).any(axis=1)]
     pnl = pnl.sum(axis=1)
     pnl.name = 'Slow F'
     pnl_idx = pnl_idx.sum(axis=1) * c
@@ -174,7 +177,7 @@ def get_good_bundle(r, rm, posvol, capital, stm=3, ns=6, min_fast=1.5, min_slow=
     c = pos.sum(axis=1).mean() / pos_idx.sum(axis=1).mean()
     p1 = pd.concat([pos.iloc[-1], pnl.iloc[-1]], axis=1) * capital
     p1.columns = ['Position', 'PnL']
-    p1 = p1.loc[p1.Position.abs() > 0]
+    p1 = p1.loc[(p1.abs() > 0).any(axis=1)]
     pnl = pnl.sum(axis=1)
     pnl.name = 'Good'
     pnl_idx = pnl_idx.sum(axis=1) * c
@@ -185,19 +188,19 @@ def get_good_bundle(r, rm, posvol, capital, stm=3, ns=6, min_fast=1.5, min_slow=
 def run_package(r, rm, posvol, score, capital=500):
     pos = []
     pnls = []
-    sig_date, p1, pnl, pnl_idx = get_fast_bundle(r, rm, posvol, capital, stm=3, ns=4, min_fast=1.5, min_slow=-.1)
-    _, p2, pnl2, _ = get_slow_bundle(r, rm, posvol, capital, stm=3, ns=4, min_fast=1.5, min_slow=-.1)
-    _, p3, pnl3, _ = get_fast_fundamental_bundle(r, rm, posvol, score, capital, stm=3, ns=4, min_fast=1.5, min_slow=-.1)
-    _, p4, pnl4, _ = get_slow_fundamental_bundle(r, rm, posvol, score, capital, stm=3, ns=4, min_fast=1.5, min_slow=-.1)
-    _, p5, pnl5, _ = get_good_bundle(r, rm, posvol, capital, stm=3, ns=6, min_fast=1.5, min_slow=.3)
+    sig_date, p1, pnl, pnl_idx = get_fast_bundle(r, rm, posvol, capital, stm=3, ns=4, min_fast=1.2, min_slow=.1)
+    _, p2, pnl2, _ = get_slow_bundle(r, rm, posvol, capital, stm=3, ns=4, min_fast=1.2, min_slow=.1)
+    #_, p3, pnl3, _ = get_fast_fundamental_bundle(r, rm, posvol, score, capital, stm=3, ns=4, min_fast=1.2, min_slow=.1)
+    #_, p4, pnl4, _ = get_slow_fundamental_bundle(r, rm, posvol, score, capital, stm=3, ns=4, min_fast=1.2, min_slow=.1)
+    _, p5, pnl5, _ = get_good_bundle(r, rm, posvol, capital, stm=3, ns=6, min_fast=1.2, min_slow=.1)
     pos.append(p1)
     pnls.append(pnl)
     pos.append(p2)
     pnls.append(pnl2)
-    pos.append(p3)
-    pnls.append(pnl3)
-    pos.append(p4)
-    pnls.append(pnl4)
+    #pos.append(p3)
+    #pnls.append(pnl3)
+    #pos.append(p4)
+    #pnls.append(pnl4)
     pos.append(p5)
     pnls.append(pnl5)
     pnls.append(pnl_idx)
@@ -207,19 +210,19 @@ def run_package(r, rm, posvol, score, capital=500):
 def run_package2(r, rm, posvol, score, capital=500):
     pos = []
     pnls = []
-    sig_date, p1, pnl, pnl_idx = get_fast_bundle(r, rm, posvol, capital, stm=7, ns=4, min_fast=.6, min_slow=.1)
-    _, p2, pnl2, _ = get_slow_bundle(r, rm, posvol, capital, stm=7, ns=4, min_fast=.6, min_slow=.1)
-    _, p3, pnl3, _ = get_fast_fundamental_bundle(r, rm, posvol, score, capital, stm=7, ns=4, min_fast=.6, min_slow=.1)
-    _, p4, pnl4, _ = get_slow_fundamental_bundle(r, rm, posvol, score, capital, stm=7, ns=4, min_fast=.6, min_slow=.1)
-    _, p5, pnl5, _ = get_good_bundle(r, rm, posvol, capital, stm=7, ns=9, min_fast=1.2, min_slow=.4)
+    sig_date, p1, pnl, pnl_idx = get_fast_bundle(r, rm, posvol, capital, stm=7, ns=11, min_fast=1.4, min_slow=.1)
+    _, p2, pnl2, _ = get_slow_bundle(r, rm, posvol, capital, stm=7, ns=11, min_fast=1.4, min_slow=.1)
+    #_, p3, pnl3, _ = get_fast_fundamental_bundle(r, rm, posvol, score, capital, stm=7, ns=11, min_fast=1.4, min_slow=.1)
+    #_, p4, pnl4, _ = get_slow_fundamental_bundle(r, rm, posvol, score, capital, stm=7, ns=11, min_fast=1.4, min_slow=.1)
+    _, p5, pnl5, _ = get_good_bundle(r, rm, posvol, capital, stm=7, ns=11, min_fast=1.4, min_slow=0.)
     pos.append(p1)
     pnls.append(pnl)
     pos.append(p2)
     pnls.append(pnl2)
-    pos.append(p3)
-    pnls.append(pnl3)
-    pos.append(p4)
-    pnls.append(pnl4)
+    #pos.append(p3)
+    #pnls.append(pnl3)
+    #pos.append(p4)
+    #pnls.append(pnl4)
     pos.append(p5)
     pnls.append(pnl5)
     pnls.append(pnl_idx)

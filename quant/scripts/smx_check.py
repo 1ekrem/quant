@@ -20,11 +20,10 @@ from quant.lib.main_utils import Email
 
 def plot_pnl(pnls):
     plt.figure(figsize=(6, 4))
-    pnl = pnls[0]
-    vu.axis_area_plot(pnl.iloc[-52:].cumsum())
-    if len(pnl) > 1:
-        for pnl2 in pnls[1:]:
-            plt.plot(pnl2.index[-52:], pnl2.iloc[-52:].cumsum(), label=pnl2.name)
+    pnl = pd.concat(pnls, axis=1)
+    vu.axis_area_plot(pnl.iloc[-52:, 0].cumsum())
+    for i in xrange(1, len(pnl.columns)):
+        plt.plot(pnl.index[-52:], pnl.iloc[-52:, i].cumsum(), label=pnl.columns[i])
     vu.use_monthly_ticks(pnl.iloc[-52:])
     plt.legend(loc='best', frameon=False)
     plt.title('Cumulative PnL', weight='bold')

@@ -109,6 +109,10 @@ def get_timeline(start_date, end_date):
     return pd.Series([0., 0.], index=[start_date, end_date]).resample('B').last()
 
 
+def get_last_business_day(run_date=dt.today()):
+    return pd.Series([0, 0], index=[run_date - relativedelta(days=5), run_date]).resample('B').last().index[-1]
+
+
 def get_table_html(table, inc_index=True, inc_columns=True, width=None):
     assert isinstance(table, pd.DataFrame)
     data = table.copy()
