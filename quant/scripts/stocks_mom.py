@@ -120,10 +120,11 @@ def get_fast_bundle(r, rm, posvol, capital, stm=3, ns=4, min_fast=1.5, min_slow=
 
 def get_fast_fundamental_bundle(r, rm, posvol, score, capital, stm=3, ns=4, min_fast=1.5, min_slow=-.1):
     pos = get_fast_fundamental_signal(r, rm, posvol, score, stm=stm, ns=ns, min_fast=min_fast, min_slow=min_slow)
+    a = get_index_signal(rm, posvol, stm)
+    c = pos.sum(axis=1).mean()
     sig_date = pos.index[-1]
     pnl = r.mul(pos.shift())
-    pos_idx = 1. / posvol.shift()
-    pnl_idx = r.mul(pos_idx.shift())
+    pnl_idx = r.mul(a.shift()).sum(axis=1) * c
     c = pos.sum(axis=1).mean() / pos_idx.sum(axis=1).mean()
     p1 = pd.concat([pos.iloc[-1], pnl.iloc[-1]], axis=1) * capital
     p1.columns = ['Position', 'PnL']
@@ -141,7 +142,7 @@ def get_slow_bundle(r, rm, posvol, capital, stm=3, ns=4, min_fast=1.5, min_slow=
     c = pos.sum(axis=1).mean()
     sig_date = pos.index[-1]
     pnl = r.mul(pos.shift())
-    pnl_idx = r.mul(x.shift()).sum(axis=1) * c
+    pnl_idx = r.mul(a.shift()).sum(axis=1) * c
     pnl_idx.name = 'Index'
     p1 = pd.concat([pos.iloc[-1], pnl.iloc[-1]], axis=1) * capital
     p1.columns = ['Position', 'PnL']
