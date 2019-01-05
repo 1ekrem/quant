@@ -12,23 +12,26 @@ def get_filename(universe):
 
 
 def get_two_plots(r):
-    channel_set = channel.get_channel_set(r)
-    run_set = []
-    backup_set = []
-    for i in xrange(len(channel_set)):
-        p = channel_set[i][3].get('points')
-        rs = channel_set[i][4]
-        if p > 3:
-            run_set.append((len(rs), i))
-        else:
-            backup_set.append((len(rs), i))
-    if len(run_set) < 2:
-        x = np.min((2 - len(run_set), len(backup_set)))
-        run_set = run_set + backup_set[-x:]
-    run_set = sorted(run_set)
-    a = channel_set[run_set[0][1]] if len(run_set) > 0 else None
-    b = channel_set[run_set[1][1]] if len(run_set) > 1 else None
-    return (a, b)
+    if r.empty:
+        return []
+    else:
+        channel_set = channel.get_channel_set(r)
+        run_set = []
+        backup_set = []
+        for i in xrange(len(channel_set)):
+            p = channel_set[i][3].get('points')
+            rs = channel_set[i][4]
+            if p > 3:
+                run_set.append((len(rs), i))
+            else:
+                backup_set.append((len(rs), i))
+        if len(run_set) < 2:
+            x = np.min((2 - len(run_set), len(backup_set)))
+            run_set = run_set + backup_set[-x:]
+        run_set = sorted(run_set)
+        a = channel_set[run_set[0][1]] if len(run_set) > 0 else None
+        b = channel_set[run_set[1][1]] if len(run_set) > 1 else None
+        return (a, b)
  
  
 def make_channel_pdf(rtns, universe='SMX', t4=None, t52=None):

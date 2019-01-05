@@ -34,14 +34,15 @@ def _get_first(x):
 def get_returns(r, max_rtn=.25):
     rc = r[r.abs() < max_rtn]
     rtn = r.resample('W').sum().apply(_get_first, axis=0)
-    rtn2 = rc.resample('W').sum().apply(_get_first, axis=0)
+    #rtn2 = rc.resample('W').sum().apply(_get_first, axis=0)
     w = rtn.abs()
     vol = w[w > 0].rolling(52, min_periods=13).median()
     vol[vol < 5e-3] = 5e-3
     vol2 = vol.copy()
     vol2[vol2 < .02] = .02
-    rv = rtn2.divide(vol)
-    rm = rv.subtract(rv.mean(axis=1), axis=0)
+    #rv = rtn2.divide(vol)
+    rv = rtn.divide(vol)
+    rm = rv.subtract(rv.median(axis=1), axis=0)
     return rtn, rm, vol2
 
 
@@ -204,8 +205,8 @@ class Momentum(object):
         data = get_financials_overall_score(self.financials)
         self.score = tu.resample(data, self.rtn).reindex(self.rtn.columns, axis=1)
     
-    def run_sim(self, stm=4, ns=10, min_fast=0., min_slow=0., fast=True, fundamental=False, good=False):
-        s1 = -1. * get_stock_mom(self.rm, stm).abs()
+    def run_sim(self, stm=3, ns=10, min_fast=0., min_slow=0., fast=True, fundamental=False, good=False):
+        s1 = -1. * get_stock_mom(self.rm, stm)
         s2 = get_stock_mom(self.rm, 52).shift(stm)
         s3 = get_stock_mom(self.rm, 52)
         holding = 0
@@ -271,7 +272,7 @@ class Momentum(object):
     
     def get_fast_set(self, base):
         ans = []
-        x = np.arange(0., 1.01, .1)
+        x = np.arange(0., 1.51, .1)
         for i, k in enumerate(x):
             msg = 'fast: %.1f .. %.1f%%' % (k, 100. * (i + 1) / len(x))
             new = base.copy()
@@ -327,6 +328,12 @@ class Momentum(object):
         a4 = self.run_pass(set4)
         min_slow = self.decide(a4)
         base['min_slow'] = min_slow
+
+        logger.info('Testing STM')
+        set = self.get_stm_set(base)
+        a = self.run_pass(set)
+        stm = self.decide(a)
+        base['stm'] = stm
 
         logger.info('Testing ns')
         set3 = self.get_stocks_set(base)

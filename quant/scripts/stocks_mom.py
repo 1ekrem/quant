@@ -19,12 +19,12 @@ def get_index_signal(rm, vol, stm=3):
     '''
     1st Gen fast signal
     '''
-    all = 1. / vol
+    all = 1. / vol * (~rm.isnull())
     all /= all.sum(axis=1).mean()
     return all
 
 
-def get_fast_signal(rtn, rm, vol, stm=3, ns=4, min_fast=1.5, min_slow=-.1):
+def get_fast_signal(rtn, rm, vol, stm=3, ns=8, min_fast=1.5, min_slow=.4):
     '''
     1st Gen fast signal
     '''
@@ -36,7 +36,7 @@ def get_fast_signal(rtn, rm, vol, stm=3, ns=4, min_fast=1.5, min_slow=-.1):
     return ans
 
 
-def get_fast_fundamental_signal(rtn, rm, vol, score, stm=3, ns=4, min_fast=1.5, min_slow=-.1):
+def get_fast_fundamental_signal(rtn, rm, vol, score, stm=3, ns=8, min_fast=1.5, min_slow=.4):
     '''
     1st Gen fast fundamental signal
     '''
@@ -47,7 +47,7 @@ def get_fast_fundamental_signal(rtn, rm, vol, score, stm=3, ns=4, min_fast=1.5, 
     return ans
 
 
-def get_slow_signal(rtn, rm, vol, stm=3, ns=4, min_fast=1.5, min_slow=-.1):
+def get_slow_signal(rtn, rm, vol, stm=3, ns=7, min_fast=1.5, min_slow=.4):
     '''
     1st Gen slow signal
     '''
@@ -59,7 +59,7 @@ def get_slow_signal(rtn, rm, vol, stm=3, ns=4, min_fast=1.5, min_slow=-.1):
     return ans
 
 
-def get_slow_fundamental_signal(rtn, rm, vol, score, stm=3, ns=4, min_fast=1.5, min_slow=-.1):
+def get_slow_fundamental_signal(rtn, rm, vol, score, stm=3, ns=8, min_fast=1.5, min_slow=.4):
     '''
     1st Gen slow fundamental signal
     '''
@@ -71,7 +71,7 @@ def get_slow_fundamental_signal(rtn, rm, vol, score, stm=3, ns=4, min_fast=1.5, 
     return ans
 
 
-def get_good_signal(rtn, rm, vol, stm=3, ns=6, min_fast=1.5, min_slow=.3):
+def get_good_signal(rtn, rm, vol, stm=3, ns=10, min_fast=1.5, min_slow=.4):
     '''
     1st Gen good signal
     '''
@@ -121,7 +121,8 @@ def get_fast_bundle(r, rm, posvol, capital, stm=3, ns=4, min_fast=1.5, min_slow=
 def get_fast_fundamental_bundle(r, rm, posvol, score, capital, stm=3, ns=4, min_fast=1.5, min_slow=-.1):
     pos = get_fast_fundamental_signal(r, rm, posvol, score, stm=stm, ns=ns, min_fast=min_fast, min_slow=min_slow)
     a = get_index_signal(rm, posvol, stm)
-    c = pos.sum(axis=1).mean()
+    c = pos.sum(axis=1)
+    c = c[c > 0].mean()
     sig_date = pos.index[-1]
     pnl = r.mul(pos.shift())
     pnl_idx = r.mul(a.shift()).sum(axis=1) * c
@@ -139,7 +140,8 @@ def get_fast_fundamental_bundle(r, rm, posvol, score, capital, stm=3, ns=4, min_
 def get_slow_bundle(r, rm, posvol, capital, stm=3, ns=4, min_fast=1.5, min_slow=-.1):
     pos = get_slow_signal(r, rm, posvol, stm=stm, ns=ns, min_fast=min_fast, min_slow=min_slow)
     a = get_index_signal(rm, posvol, stm)
-    c = pos.sum(axis=1).mean()
+    c = pos.sum(axis=1)
+    c = c[c > 0].mean()
     sig_date = pos.index[-1]
     pnl = r.mul(pos.shift())
     pnl_idx = r.mul(a.shift()).sum(axis=1) * c
@@ -189,11 +191,11 @@ def get_good_bundle(r, rm, posvol, capital, stm=3, ns=6, min_fast=1.5, min_slow=
 def run_package(r, rm, posvol, score, capital=500):
     pos = []
     pnls = []
-    sig_date, p1, pnl, pnl_idx = get_fast_bundle(r, rm, posvol, capital, stm=3, ns=4, min_fast=1.2, min_slow=.1)
-    _, p2, pnl2, _ = get_slow_bundle(r, rm, posvol, capital, stm=3, ns=4, min_fast=1.2, min_slow=.1)
+    sig_date, p1, pnl, pnl_idx = get_fast_bundle(r, rm, posvol, capital, stm=3, ns=8, min_fast=1.5, min_slow=.4)
+    _, p2, pnl2, _ = get_slow_bundle(r, rm, posvol, capital, stm=3, ns=7, min_fast=1.5, min_slow=.4)
     #_, p3, pnl3, _ = get_fast_fundamental_bundle(r, rm, posvol, score, capital, stm=3, ns=4, min_fast=1.2, min_slow=.1)
     #_, p4, pnl4, _ = get_slow_fundamental_bundle(r, rm, posvol, score, capital, stm=3, ns=4, min_fast=1.2, min_slow=.1)
-    _, p5, pnl5, _ = get_good_bundle(r, rm, posvol, capital, stm=3, ns=6, min_fast=1.2, min_slow=.1)
+    _, p5, pnl5, _ = get_good_bundle(r, rm, posvol, capital, stm=3, ns=10, min_fast=1.5, min_slow=.4)
     pos.append(p1)
     pnls.append(pnl)
     pos.append(p2)
