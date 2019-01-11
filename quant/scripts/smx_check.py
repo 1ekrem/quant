@@ -122,7 +122,6 @@ def main():
         target = sys.argv[1]
     if target == 'SMX':
         run_smx_check()
-        run_smx_check2()
     elif target == 'FTSE250':
         run_ftse250_check()
     elif target == 'AIM':

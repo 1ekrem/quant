@@ -252,7 +252,7 @@ class Momentum(object):
         
     def get_stm_set(self, base):
         ans = []
-        x = np.arange(3, 14)
+        x = np.arange(2, 14)
         for i, k in enumerate(x):
             msg = 'stm: %d .. %.1f%%' % (k, 100. * (i + 1) / len(x))
             new = base.copy()
