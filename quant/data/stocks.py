@@ -36,33 +36,11 @@ def create_google_table():
 
 
 # Tickers
-def read_tickers_file(filename):
-    try: 
-        ans = pd.read_excel(os.path.expanduser('~/TempWork/scripts/%s.xlsx' % filename))
-        ans.index = ans.ID
-        ans = ans.loc[ans.Included == 'Yes']
-        return ans.Name
-    except:
-        return None
-
-
 def _save_tickers(data, universe):
     if data is not None:
         data.name = universe
         tu.store_description(data, DATABASE_NAME, STOCKS_DESCRIPTION)
 
-
-def import_tickers(filename, universe):
-    data = read_tickers_file(filename)
-    _save_tickers(data, universe)
-
-
-def import_ftse_smx_tickers():
-    import_tickers('FTSESMX', 'SMX')
-
-
-def import_ftse250_tickers():
-    import_tickers('FTSE250', 'FTSE250')
 
 # Bloomberg prices
 def import_bloomberg_prices(data_type='stock'):
@@ -200,18 +178,6 @@ def import_google_prices(ticker, exchange='LON', period='1Y', data_table=UK_STOC
         save_data(data, ticker, data_table, load_volume, clean_data)
 
 
-def import_saved_stock_prices():
-    filename = os.path.expanduser('~/TempWork/scripts/stocks.xlsx')
-    ff = pd.ExcelFile(filename)
-    ans = {}
-    for stock in ff.sheet_names:
-        logger.info('Importing %s' % stock)
-        data = ff.parse(stock)
-        data.index = data.Date
-        data['Close'] = data['Adj Close']
-        save_data(data, stock, UK_STOCKS, True, True)
-        
-
 def import_ftse250_index_prices(period='1Y'):
     import_google_prices('MCX', 'INDEXFTSE', period, GLOBAL_ASSETS, load_volume=False, clean_data=False)
 
@@ -325,11 +291,3 @@ def load_financial_data(data_name='revenue', tickers=None, data_table=UK_FINANCI
     return tu.get_timeseries(DATABASE_NAME, data_table, column_list=tickers, data_name=data_name)
 
 
-def create_universe():
-    create_google_table()
-    import_ftse_smx_tickers()
-    import_ftse250_tickers()
-    import_ftse250_index_prices('20Y')
-    import_exchange_rates('20Y')
-    import_smx_google_prices('20Y')
-    import_ftse250_google_prices('20Y')
