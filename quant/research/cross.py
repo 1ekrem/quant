@@ -374,17 +374,17 @@ class Momentum(object):
     
     def patch_results(self):
         self.results = {'Fast': [{'fast': True, 'fundamental': False,
-                                              'min_fast': 0., 'min_slow': 0.,
-                                              'ns': 4, 'stm': 3}],
+                                              'min_fast': 1.5, 'min_slow': .4,
+                                              'ns': 8, 'stm': 3}],
                         'Fast Fundamental': [{'fast': True, 'fundamental': True,
-                                              'min_fast': 0., 'min_slow': 0.,
-                                              'ns': 4, 'stm': 3}],
+                                              'min_fast': 1.5, 'min_slow': .4,
+                                              'ns': 8, 'stm': 3}],
                         'Slow': [{'fast': False, 'fundamental': False,
-                                              'min_fast': 0., 'min_slow': 0.,
-                                              'ns': 4, 'stm': 3}],
+                                              'min_fast': 1.5, 'min_slow': .4,
+                                              'ns': 7, 'stm': 3}],
                         'Slow Fundamental': [{'fast': False, 'fundamental': True,
-                                              'min_fast': 0., 'min_slow': 0.,
-                                              'ns': 4, 'stm': 3}]}
+                                              'min_fast': 1.5, 'min_slow': .4,
+                                              'ns': 7, 'stm': 3}]}
 
     def plot_simulations(self):
         plt.figure()
