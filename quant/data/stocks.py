@@ -29,7 +29,6 @@ AIM_EXCLUDED = []
 
 
 def create_google_table():
-    du.create_t2_timeseries_table(DATABASE_NAME, GLOBAL_ASSETS)
     du.create_t2_timeseries_table(DATABASE_NAME, UK_STOCKS)
     du.create_t2_timeseries_table(DATABASE_NAME, UK_FINANCIALS)
     du.create_t2_timeseries_table(DATABASE_NAME, UK_ESTIMATES)
@@ -75,19 +74,6 @@ def export_smx_bloomberg_file():
     today = dt.today().strftime('%m/%d/%Y')
     for i, x in enumerate(u.index):
         s = '''=BDH("%s Equity", "PX_LAST", "1/1/2017", "%s")''' % (x, today)
-        ans.append(pd.DataFrame([[s, '']], columns=[i+1, x], index=[0]))
-    ans = pd.concat(ans, axis=1)
-    ff = pd.ExcelWriter(filename)
-    ans.to_excel(ff, 'BBG')
-    ff.save()
-
-
-def export_global_bloomberg_file():
-    filename = os.path.expanduser('~/TempWork/scripts/bloomberg_global.xlsx')
-    ans = []
-    today = dt.today().strftime('%m/%d/%Y')
-    for i, x in enumerate(['MCX Index', 'GBPUSD BGN Curncy', 'EURUSD BGN Curncy', 'EURGBP BGN Curncy']):
-        s = '''=BDH("%s", "PX_LAST", "1/1/2017", "%s")''' % (x, today)
         ans.append(pd.DataFrame([[s, '']], columns=[i+1, x], index=[0]))
     ans = pd.concat(ans, axis=1)
     ff = pd.ExcelWriter(filename)
@@ -176,41 +162,6 @@ def import_google_prices(ticker, exchange='LON', period='1Y', data_table=UK_STOC
         logger.info('Data not found')
     else:
         save_data(data, ticker, data_table, load_volume, clean_data)
-
-
-def import_ftse250_index_prices(period='1Y'):
-    import_google_prices('MCX', 'INDEXFTSE', period, GLOBAL_ASSETS, load_volume=False, clean_data=False)
-
-
-def import_ftse250_index_prices_from_yahoo(days=30):
-    end_date = dt.today()
-    start_date = end_date - relativedelta(days=days)
-    import_yahoo_prices('^FTMC', 'MCX', start_date, end_date, data_table=GLOBAL_ASSETS, load_volume=False, clean_data=False)
-
-
-def import_exchange_rates(period='1M'):
-    import_google_prices('GBPUSD', 'CURRENCY', period, GLOBAL_ASSETS, load_volume=False, clean_data=False)
-    import_google_prices('EURUSD', 'CURRENCY', period, GLOBAL_ASSETS, load_volume=False, clean_data=False)
-    import_google_prices('EURGBP', 'CURRENCY', period, GLOBAL_ASSETS, load_volume=False, clean_data=False)
-    
-
-def import_exchange_rates_from_yahoo(days=30):
-    end_date = dt.today()
-    start_date = end_date - relativedelta(days=days)
-    import_yahoo_prices('GBPUSD=X', 'GBPUSD', start_date, end_date, data_table=GLOBAL_ASSETS,
-                        load_volume=False, clean_data=False)
-    import_yahoo_prices('EURUSD=X', 'EURUSD', start_date, end_date, data_table=GLOBAL_ASSETS,
-                        load_volume=False, clean_data=False)
-    import_yahoo_prices('EURGBP=X', 'EURGBP', start_date, end_date, data_table=GLOBAL_ASSETS,
-                        load_volume=False, clean_data=False)
-    
-
-def import_uk_google_prices(period='1Y'):
-    u = get_ftse_smx_universe()
-    u2 = get_ftse250_universe()
-    u = pd.concat([u, u2.loc[~u2.index.isin(u.index)]], axis=0)
-    for idx in u.index:
-        import_google_prices(idx, 'LON', period, UK_STOCKS)
 
 
 def import_uk_yahoo_prices(years=1, missing=False):
