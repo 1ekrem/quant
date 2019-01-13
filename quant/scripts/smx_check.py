@@ -13,7 +13,6 @@ import pandas as pd
 from matplotlib import pyplot as plt
 from datetime import datetime as dt
 from quant.scripts import stocks_mom as sm
-from quant.strategies import smx
 from quant.lib import timeseries_utils as tu, visualization_utils as vu
 from quant.lib.main_utils import Email
 
