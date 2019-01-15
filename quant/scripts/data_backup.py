@@ -1,5 +1,6 @@
 from quant.lib.main_utils import *
 import pandas as pd
+from quant.lib import timeseries_utils as tu
 from quant.data import stocks
 
 
@@ -18,6 +19,8 @@ def export_lse_spreads():
 def import_lse_spreads():
     filename = get_filename('spread')
     ans = pd.read_excel(filename)
+    ans.index = ans.time_index
+    ans = ans.iloc[:, 1:]
     tu.store_timeseries(ans, stocks.DATABASE_NAME, stocks.UK_STOCKS, 'Spread')
 
 
@@ -32,6 +35,7 @@ def export_lse_ids():
 def import_lse_ids():
     filename = get_filename('LSEID')
     ans = pd.read_excel(filename)
+    ans.index = ans.column_name
     stocks._save_tickers(ans.LSE, 'LSE')
 
 
@@ -51,6 +55,8 @@ def import_reuters_data():
     f = pd.ExcelFile(filename)
     for data_name in tags:
         data = f.parse(data_name)
+        data.index = data.time_index
+        data = data.iloc[:, 1:]
         tu.store_timeseries(data, stocks.DATABASE_NAME, stocks.UK_ESTIMATES, data_name)
 
 
@@ -65,6 +71,7 @@ def export_reuters_ids():
 def import_reuters_ids():
     filename = get_filename('ReutersID')
     ans = pd.read_excel(filename)
+    ans.index = ans.column_name
     stocks._save_tickers(ans.Reuters, 'Reuters')
 
 
@@ -82,7 +89,11 @@ def import_stock_returns():
     f = pd.ExcelFile(filename)
     for data_type in ['Returns', 'Volume']:
         ans = f.parse(data_type)
-        tu.store_timeseries(ans, stocks.DATABASE_NAME, stocks.UK_STOCKS, data_type)
+        ans.index = ans.time_index
+        ans = ans.iloc[:, 1:]
+        for c in ans.columns:
+            logger.info('Storing %s' % c)
+            tu.store_timeseries(ans.loc[:, c].dropna().to_frame(), stocks.DATABASE_NAME, stocks.UK_STOCKS, data_type)
 
 
 def export_data():

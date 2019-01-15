@@ -3,22 +3,15 @@ Created on 18 Sep 2017
 
 @author: wayne
 '''
-import os
-import time
-import numpy as np
-import pandas as pd
+from quant.lib.main_utils import *
 import googlefinance.client as gc
 from quant.lib import data_utils as du, timeseries_utils as tu, portfolio_utils as pu, web_utils as wu
-from quant.lib.main_utils import logger
 from quant.data import quandldata
-from datetime import datetime as dt
-from dateutil.relativedelta import relativedelta
 import fix_yahoo_finance as yf
 
 
 DATABASE_NAME = 'quant'
 STOCKS_DESCRIPTION = 'stocks_description'
-GLOBAL_ASSETS = 'global_assets'
 UK_STOCKS = 'uk_stocks'
 UK_FINANCIALS = 'uk_financials'
 UK_ESTIMATES = 'uk_estimates'
@@ -29,6 +22,7 @@ AIM_EXCLUDED = []
 
 
 def create_google_table():
+    du.create_table(DATABASE_NAME, STOCKS_DESCRIPTION, du.DESCRIPTION_TABLE_FORMAT)
     du.create_t2_timeseries_table(DATABASE_NAME, UK_STOCKS)
     du.create_t2_timeseries_table(DATABASE_NAME, UK_FINANCIALS)
     du.create_t2_timeseries_table(DATABASE_NAME, UK_ESTIMATES)
@@ -230,7 +224,7 @@ def load_uk_universe():
     return u
 
 
-def load_google_returns(start_date=None, end_date=None, tickers=None, data_name='Returns', data_table=GLOBAL_ASSETS):
+def load_google_returns(start_date=None, end_date=None, tickers=None, data_name='Returns', data_table=UK_STOCKS):
     if start_date is None and end_date is None:
         return tu.get_timeseries(DATABASE_NAME, data_table, column_list=tickers, data_name=data_name)
     else:

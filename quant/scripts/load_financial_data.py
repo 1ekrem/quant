@@ -47,7 +47,13 @@ def load_lse_ids(missing=True):
     u = stocks.load_uk_universe()
     if missing:
         existing = stocks.get_universe('LSE')
-        u = u.loc[~u.index.isin(existing.index)]
+        u2 = u.loc[~u.index.isin(existing.index)]
+        if u2.empty:
+            s = stocks.load_google_returns(data_name='Spread')
+            s = s.iloc[-1].loc[u.index]
+            u = u.loc[s.isnull()]
+        else:
+            u = u2
     ans = pd.Series([])
     i = 0
     for ticker in u.index:
@@ -67,6 +73,7 @@ def load_lse_ids(missing=True):
 
 def update_lse_ids():
     ans = pd.Series([])
+    ans.loc['AA'] = 'GB00BMSKPJ95GBGBXSSMM'
     ans.loc['ASAI'] = 'GB00BDFXHW57GBGBXSSMM'
     ans.loc['RWI'] = 'GB0007995243GBGBXSSMM'
     ans.loc['HWDN'] = 'GB0005576813GBGBXSTMM'

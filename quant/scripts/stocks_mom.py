@@ -7,7 +7,7 @@ import pandas as pd
 import numpy as np
 from quant.lib import portfolio_utils as pu
 from quant.data import stocks
-from quant.research import cross, channel
+from quant.research import cross
 from datetime import datetime as dt
 from statsmodels.tsa.vector_ar.util import get_index
 
